@@ -215,3 +215,8 @@ select {
 .terrain-controls .slider {
   flex: 1;
 }
+
+/* We use no Cesium ion services, so only the data attribution stays. */
+.mars-viewer .cesium-credit-logoContainer {
+  display: none !important;
+}

@@ -1,0 +1,339 @@
+/* Route panel. Colours, spacing and radii come only from styles/tokens.css. */
+
+.route-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.route-panel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 32px;
+}
+
+.route-panel__title {
+  margin: 0;
+  font-size: var(--fs-16);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+}
+
+.route-panel__region {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-13);
+  color: var(--c-text-3);
+}
+
+.route-panel__reset {
+  margin-left: auto;
+}
+
+.route-empty,
+.route-status {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--c-text-2);
+}
+
+.route-status {
+  color: var(--c-text-3);
+}
+
+/* ---------- points ---------- */
+
+.route-points {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--s-1);
+}
+
+.route-points__rows {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  background: var(--c-ground);
+}
+
+.route-points__rows > * + * {
+  border-top: 1px solid var(--c-line);
+}
+
+.route-point {
+  display: grid;
+  grid-template-columns: 20px 1fr auto auto;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  padding: var(--s-1) var(--s-1) var(--s-1) var(--s-3);
+}
+
+.route-point__badge {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--c-accent);
+  box-shadow: inset 0 0 0 1.5px var(--c-accent);
+}
+
+.route-point[data-empty] .route-point__badge {
+  color: var(--c-text-3);
+  box-shadow: inset 0 0 0 1px var(--c-line-strong);
+}
+
+.route-point__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-13);
+}
+
+.route-point[data-empty] .route-point__text {
+  color: var(--c-text-3);
+}
+
+.route-point[data-picking] {
+  background: var(--c-accent-soft);
+}
+
+.route-points__rows > .route-point:first-child {
+  border-radius: var(--r-card) var(--r-card) 0 0;
+}
+
+.route-points__rows > .route-point:last-child {
+  border-radius: 0 0 var(--r-card) var(--r-card);
+}
+
+.route-point[data-picking] .route-point__text {
+  color: var(--c-accent);
+}
+
+.route-point__pick[aria-pressed='true'] {
+  color: var(--c-accent);
+  background: var(--c-raised);
+}
+
+.route-point__clear:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: transparent;
+}
+
+.route-points__swap:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: transparent;
+}
+
+/* ---------- mode ---------- */
+
+.route-mode {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.route-mode__hint {
+  margin: 0;
+  font-size: var(--fs-12);
+  color: var(--c-text-3);
+}
+
+/* ---------- stats ---------- */
+
+.route-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--c-line);
+  transition: opacity var(--t-enter) var(--ease);
+}
+
+.route-stats[data-stale] {
+  opacity: 0.5;
+}
+
+.route-stats__main .stat__value {
+  font-size: var(--fs-28);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.route-stats__main .stat__unit {
+  font-size: var(--fs-16);
+}
+
+.route-stats__row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-3);
+}
+
+.route-stats__row .stat__value {
+  font-size: var(--fs-16);
+}
+
+.route-stats__row .stat__unit {
+  font-size: var(--fs-12);
+}
+
+/* ---------- elevation profile ---------- */
+
+.route-profile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+}
+
+.route-profile__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+
+.route-profile__range {
+  font-size: var(--fs-12);
+  color: var(--c-text-3);
+}
+
+.route-profile__chart {
+  margin-left: calc(-1 * var(--s-1));
+}
+
+.route-profile .recharts-cartesian-grid-horizontal line {
+  stroke: var(--c-line);
+}
+
+.route-profile .recharts-cartesian-axis-tick-value {
+  fill: var(--c-text-3);
+  font-size: var(--fs-12);
+}
+
+.route-profile .recharts-area-curve {
+  stroke: var(--c-accent);
+}
+
+.route-profile .recharts-surface:focus {
+  outline: none;
+}
+
+.route-profile .recharts-wrapper:has(:focus-visible) {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+  border-radius: var(--r-control);
+}
+
+.route-profile__tip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s-2) var(--s-3);
+  background: var(--c-overlay);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  font-size: var(--fs-12);
+  color: var(--c-text-2);
+  white-space: nowrap;
+}
+
+.route-profile__tip span:first-child {
+  font-size: var(--fs-13);
+  color: var(--c-text);
+}
+
+/* ---------- errors ---------- */
+
+.route-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+}
+
+/* ---------- A* vs Dijkstra ---------- */
+
+.route-compare__trigger {
+  align-self: flex-start;
+}
+
+.route-compare {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--c-line);
+}
+
+.route-compare__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.route-compare__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route-compare__row {
+  display: grid;
+  grid-template-columns: 72px 1fr 56px auto;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-13);
+  color: var(--c-text-2);
+}
+
+.route-compare__row[data-active] {
+  color: var(--c-text);
+}
+
+.route-compare__bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--c-overlay);
+  overflow: hidden;
+}
+
+.route-compare__bar span {
+  display: block;
+  height: 100%;
+  background: var(--c-text-3);
+}
+
+.route-compare__row[data-active] .route-compare__bar span {
+  background: var(--c-text-2);
+}
+
+.route-compare__count {
+  text-align: right;
+}
+
+.route-compare__row [aria-pressed='true'] {
+  color: var(--c-text);
+  background: var(--c-raised);
+}
+
+.route-compare__note {
+  margin: 0;
+  font-size: var(--fs-12);
+  color: var(--c-text-3);
+}

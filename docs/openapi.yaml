@@ -1,0 +1,667 @@
+openapi: 3.1.0
+info:
+  title: NasaSpace API
+  version: 1.0.0
+  description: |
+    Контракт между фронтендом NasaSpace (Vite + React + TypeScript) и бэкендом на Java.
+    Источник истины на стороне фронта: `frontend/src/api/types.ts` (типы) и
+    `frontend/src/api/client.ts` (пути, методы, параметры, обработка ошибок).
+    Эталонное поведение: `frontend/src/api/mock/*.ts`.
+
+    Соглашения
+    - Координаты: планетоцентрические градусы на эллипсоиде Марса,
+      долгота положительна на восток, диапазон [-180, 180].
+    - Высоты: метры относительно ареоида MOLA (Mars "sea level").
+    - Расстояния: метры. Уклоны: градусы. Длительности: марсианские сутки (сол).
+    - Сетки (террейн и слои): row-major, начало в северо-западном углу,
+      длина массива равна width * height, индекс = row * width + col.
+    - Любой ответ не 2xx несёт JSON-тело ApiErrorBody {code, message};
+      message показывается пользователю как есть, поэтому по-русски и с подсказкой, что делать дальше.
+    - Базы данных нет: сетки и точки хранятся в памяти бэкенда.
+servers:
+  - url: http://localhost:8080
+    description: Локальный бэкенд (фронт подставляет свой адрес через VITE_API_URL)
+tags:
+  - name: regions
+  - name: terrain
+  - name: places
+  - name: route
+  - name: trails
+  - name: sun
+paths:
+  /regions:
+    get:
+      tags: [regions]
+      operationId: getRegions
+      summary: Список смоделированных районов
+      description: Все районы (5-6 штук), для которых есть рельеф. Остальной Марс на фронте только подложка.
+      responses:
+        '200':
+          description: Список районов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Region'
+              example:
+                - id: jezero
+                  name: Кратер Езеро
+                  summary: Древнее озеро с дельтой реки, место посадки Perseverance
+                  bbox: [76.9, 17.9, 78.1, 18.9]
+                  center: { lon: 77.5, lat: 18.4 }
+                  baseHeight: -2600
+                - id: gale
+                  name: Кратер Гейл
+                  summary: Кратер с горой Шарп в центре, где работает Curiosity
+                  bbox: [136.9, -5.9, 138.3, -4.3]
+                  center: { lon: 137.55, lat: -5.0 }
+                  baseHeight: -4500
+        '500':
+          $ref: '#/components/responses/Internal'
+  /terrain/{regionId}:
+    get:
+      tags: [terrain]
+      operationId: getTerrain
+      summary: Сетка высот района
+      description: |
+        Регулярная сетка высот, покрывающая bbox района. Row-major, от северо-западного угла.
+        Моки отдают 257 x 257 (66 049 значений); бэкенд может отдавать другой размер,
+        фронт читает width и height из ответа. Ответ большой, рекомендуется gzip.
+        В примере массив heights сокращён.
+      parameters:
+        - $ref: '#/components/parameters/RegionId'
+      responses:
+        '200':
+          description: Сетка высот
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerrainGrid'
+              example:
+                regionId: jezero
+                bbox: [76.9, 17.9, 78.1, 18.9]
+                width: 257
+                height: 257
+                resolution: 263.2
+                heights: [-2210, -2214, -2219, -2223]
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /layers/{regionId}/{kind}:
+    get:
+      tags: [terrain]
+      operationId: getLayer
+      summary: Слой уклона или опасности
+      description: |
+        Та же раскладка сетки, что у TerrainGrid (тот же bbox, width, height).
+        slope в градусах, hazard в диапазоне 0..1. В примере массив values сокращён.
+      parameters:
+        - $ref: '#/components/parameters/RegionId'
+        - name: kind
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/LayerKind'
+      responses:
+        '200':
+          description: Сетка значений слоя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayerGrid'
+              example:
+                regionId: jezero
+                kind: slope
+                bbox: [76.9, 17.9, 78.1, 18.9]
+                width: 257
+                height: 257
+                values: [2.4, 3.1, 1.8, 0.9]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /places:
+    get:
+      tags: [places]
+      operationId: searchPlaces
+      summary: Поиск мест по названию
+      description: |
+        Регистронезависимый поиск подстроки по name и description.
+        Пустой q возвращает первые limit мест. Фронт всегда передаёт limit=8.
+        Если ничего не найдено: пустой массив и 200, не 404.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Поисковая строка, может быть пустой.
+          schema:
+            type: string
+          example: Perseverance
+        - name: limit
+          in: query
+          required: false
+          description: Максимум результатов.
+          schema:
+            type: integer
+            minimum: 1
+            default: 8
+      responses:
+        '200':
+          description: Найденные места
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Place'
+              example:
+                - id: octavia-butler
+                  name: Посадка Perseverance
+                  kind: landing-site
+                  regionId: jezero
+                  position: { lon: 77.4508, lat: 18.4447 }
+                  height: -2613
+                  slope: 1.8
+                  description: Площадка «Октавия Батлер», где Perseverance сел 18 февраля 2021 года.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /route:
+    post:
+      tags: [route]
+      operationId: buildRoute
+      summary: Построить маршрут
+      description: |
+        Строит маршрут между двумя точками внутри района. Режимы и лимиты (эталон: mock/router.ts):
+        rover до 20 градусов уклона и 150 м за сол; astronaut до 30 градусов и 6000 м за сол.
+        stats.sols = length / метры за сол, округление до 0.1.
+        Первая и последняя точки маршрута совпадают с from и to из запроса.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteRequest'
+            example:
+              regionId: jezero
+              from: { lon: 77.4508, lat: 18.4447 }
+              to: { lon: 77.38, lat: 18.5 }
+              mode: rover
+      responses:
+        '200':
+          description: Маршрут
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Route'
+              example:
+                regionId: jezero
+                mode: rover
+                points:
+                  - { lon: 77.4508, lat: 18.4447, height: -2613, distance: 0, slope: 1.8 }
+                  - { lon: 77.4414, lat: 18.4492, height: -2609, distance: 1180, slope: 3.2 }
+                  - { lon: 77.38, lat: 18.5, height: -2541, distance: 9460, slope: 4.7 }
+                stats:
+                  length: 9460
+                  ascent: 112
+                  descent: 44
+                  maxSlope: 11.3
+                  sols: 63.1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/RouteUnprocessable'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /route/debug:
+    post:
+      tags: [route]
+      operationId: buildRouteDebug
+      summary: Маршрут с внутренностями поиска (A* против Dijkstra)
+      description: |
+        Тот же запрос, что /route, плюс порядок раскрытия клеток для визуального сравнения алгоритмов.
+        Отличие от /route: если путь не найден, ответ 200 с route: null
+        (а не 422 UNREACHABLE). Ошибки OUT_OF_REGION и UNREACHABLE для слишком крутой
+        начальной или конечной точки возвращаются как 422, как и в /route.
+      parameters:
+        - name: algorithm
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [astar, dijkstra]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteRequest'
+            example:
+              regionId: jezero
+              from: { lon: 77.4508, lat: 18.4447 }
+              to: { lon: 77.38, lat: 18.5 }
+              mode: rover
+      responses:
+        '200':
+          description: Маршрут и посещённые клетки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteDebug'
+              example:
+                algorithm: astar
+                visited:
+                  - [77.4508, 18.4447]
+                  - [77.4555, 18.4447]
+                  - [77.4508, 18.4494]
+                route: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/RouteUnprocessable'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /trails:
+    get:
+      tags: [trails]
+      operationId: getTrails
+      summary: Тропы района (рёбра дорожного графа)
+      description: |
+        Полилинии существующих троп района. В моках это три маршрута режима astronaut
+        между фиксированными точками района; бэкенд волен отдавать свой граф.
+        Если троп нет, возвращается пустой массив.
+      parameters:
+        - name: regionId
+          in: query
+          required: true
+          schema:
+            type: string
+          example: jezero
+      responses:
+        '200':
+          description: Тропы
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Trail'
+              example:
+                - id: jezero-t0
+                  regionId: jezero
+                  name: Тропа 1
+                  points:
+                    - { lon: 77.08, lat: 18.4 }
+                    - { lon: 77.5, lat: 18.41 }
+                    - { lon: 77.92, lat: 18.4 }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sun:
+    get:
+      tags: [sun]
+      operationId: getSun
+      summary: Положение Солнца в точке
+      description: |
+        Положение Солнца для точки, сола и местного среднего солнечного времени (LMST).
+        Эталонная математика: sunState в frontend/src/api/mock/index.ts.
+      parameters:
+        - name: lon
+          in: query
+          required: true
+          description: Долгота, градусы, восток положителен.
+          schema:
+            type: number
+            minimum: -180
+            maximum: 180
+          example: 77.45
+        - name: lat
+          in: query
+          required: true
+          description: Широта, градусы.
+          schema:
+            type: number
+            minimum: -90
+            maximum: 90
+          example: 18.44
+        - name: sol
+          in: query
+          required: true
+          description: Номер сола (число; фронт передаёт его как есть).
+          schema:
+            type: number
+          example: 120
+        - name: hour
+          in: query
+          required: true
+          description: Местное среднее солнечное время, часы 0..24. Возвращается как lmst.
+          schema:
+            type: number
+            minimum: 0
+            maximum: 24
+          example: 14.5
+      responses:
+        '200':
+          description: Состояние Солнца
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SunState'
+              example:
+                sol: 120
+                lmst: 14.5
+                elevation: 38.2
+                azimuth: 262.4
+                hoursToSunset: 3.4
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/Internal'
+components:
+  parameters:
+    RegionId:
+      name: regionId
+      in: path
+      required: true
+      description: Идентификатор района из GET /regions (jezero, gale, olympus, melas, utopia, elysium).
+      schema:
+        type: string
+      example: jezero
+  responses:
+    BadRequest:
+      description: Неверные параметры или тело запроса.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorBody'
+          example:
+            code: BAD_REQUEST
+            message: 'Неверный режим. Допустимо: rover или astronaut'
+    NotFound:
+      description: Район (или другой ресурс) не найден.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorBody'
+          example:
+            code: NOT_FOUND
+            message: Район atlantis не найден
+    RouteUnprocessable:
+      description: |
+        Запрос корректен, но маршрут построить нельзя.
+        OUT_OF_REGION: точка вне bbox района. UNREACHABLE: начальная или конечная точка
+        круче лимита режима, либо путь перекрыт слишком крутыми склонами.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorBody'
+          examples:
+            outOfRegion:
+              summary: Точка вне района
+              value:
+                code: OUT_OF_REGION
+                message: 'Точка вне зоны: выберите место внутри района'
+            unreachable:
+              summary: Цель недостижима
+              value:
+                code: UNREACHABLE
+                message: 'Цель недостижима: путь перекрыт слишком крутыми склонами'
+    Internal:
+      description: Внутренняя ошибка сервера.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorBody'
+          example:
+            code: INTERNAL
+            message: Внутренняя ошибка сервера. Попробуйте ещё раз
+  schemas:
+    LonLat:
+      type: object
+      description: Точка в планетоцентрических градусах.
+      required: [lon, lat]
+      properties:
+        lon:
+          type: number
+          description: Долгота, градусы, восток положителен, [-180, 180].
+        lat:
+          type: number
+          description: Широта, градусы, [-90, 90].
+    BBox:
+      type: array
+      description: 'Границы [west, south, east, north] в градусах.'
+      minItems: 4
+      maxItems: 4
+      items:
+        type: number
+    Region:
+      type: object
+      description: Один из смоделированных районов.
+      required: [id, name, summary, bbox, center, baseHeight]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        summary:
+          type: string
+          description: Одна строка описания для списка районов.
+        bbox:
+          $ref: '#/components/schemas/BBox'
+        center:
+          $ref: '#/components/schemas/LonLat'
+        baseHeight:
+          type: number
+          description: Типичная высота дна района, метры от ареоида MOLA.
+    TerrainGrid:
+      type: object
+      description: Регулярная сетка высот, row-major от северо-западного угла.
+      required: [regionId, bbox, width, height, heights, resolution]
+      properties:
+        regionId:
+          type: string
+        bbox:
+          $ref: '#/components/schemas/BBox'
+        width:
+          type: integer
+          description: Число столбцов (вдоль долготы, с запада на восток).
+        height:
+          type: integer
+          description: Число строк (вдоль широты, с севера на юг).
+        heights:
+          type: array
+          description: Высоты, метры от ареоида MOLA. Длина равна width * height, индекс = row * width + col.
+          items:
+            type: number
+        resolution:
+          type: number
+          description: Расстояние по земле между соседними отсчётами, метры.
+    LayerKind:
+      type: string
+      enum: [slope, hazard]
+    LayerGrid:
+      type: object
+      description: Сетка слоя, раскладка как у TerrainGrid.
+      required: [regionId, kind, bbox, width, height, values]
+      properties:
+        regionId:
+          type: string
+        kind:
+          $ref: '#/components/schemas/LayerKind'
+        bbox:
+          $ref: '#/components/schemas/BBox'
+        width:
+          type: integer
+        height:
+          type: integer
+        values:
+          type: array
+          description: Для slope градусы, для hazard 0..1. Длина равна width * height.
+          items:
+            type: number
+    PlaceKind:
+      type: string
+      enum: [landing-site, crater, mountain, canyon, plain, feature]
+    Place:
+      type: object
+      required: [id, name, kind, regionId, position, height, slope, description]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        kind:
+          $ref: '#/components/schemas/PlaceKind'
+        regionId:
+          type: string
+        position:
+          $ref: '#/components/schemas/LonLat'
+        height:
+          type: number
+          description: Высота в точке, метры от ареоида MOLA.
+        slope:
+          type: number
+          description: Уклон в точке, градусы.
+        description:
+          type: string
+    TravelMode:
+      type: string
+      enum: [rover, astronaut]
+      description: 'rover: до 20 градусов, 150 м за сол. astronaut: до 30 градусов, 6000 м за сол.'
+    RouteRequest:
+      type: object
+      required: [regionId, from, to, mode]
+      properties:
+        regionId:
+          type: string
+        from:
+          $ref: '#/components/schemas/LonLat'
+        to:
+          $ref: '#/components/schemas/LonLat'
+        mode:
+          $ref: '#/components/schemas/TravelMode'
+    RoutePoint:
+      description: Точка маршрута (LonLat плюс высота, дистанция и уклон).
+      allOf:
+        - $ref: '#/components/schemas/LonLat'
+        - type: object
+          required: [height, distance, slope]
+          properties:
+            height:
+              type: number
+              description: Высота, метры от ареоида MOLA.
+            distance:
+              type: number
+              description: Расстояние от начала маршрута вдоль него, метры. У первой точки 0.
+            slope:
+              type: number
+              description: Уклон в точке, градусы.
+    RouteStats:
+      type: object
+      required: [length, ascent, descent, maxSlope, sols]
+      properties:
+        length:
+          type: number
+          description: Длина маршрута, метры.
+        ascent:
+          type: number
+          description: Суммарный набор высоты, метры.
+        descent:
+          type: number
+          description: Суммарный спуск, метры (положительное число).
+        maxSlope:
+          type: number
+          description: Максимальный уклон вдоль маршрута, градусы.
+        sols:
+          type: number
+          description: Длительность в солах (length / метры за сол режима).
+    Route:
+      type: object
+      required: [regionId, mode, points, stats]
+      properties:
+        regionId:
+          type: string
+        mode:
+          $ref: '#/components/schemas/TravelMode'
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoutePoint'
+        stats:
+          $ref: '#/components/schemas/RouteStats'
+    RouteDebug:
+      type: object
+      required: [algorithm, visited, route]
+      properties:
+        algorithm:
+          type: string
+          enum: [astar, dijkstra]
+        visited:
+          type: array
+          description: Клетки сетки в порядке раскрытия, пары [lon, lat].
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: number
+        route:
+          description: Маршрут или null, если путь не найден.
+          oneOf:
+            - $ref: '#/components/schemas/Route'
+            - type: 'null'
+    Trail:
+      type: object
+      required: [id, regionId, name, points]
+      properties:
+        id:
+          type: string
+        regionId:
+          type: string
+        name:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/LonLat'
+    SunState:
+      type: object
+      required: [sol, lmst, elevation, azimuth, hoursToSunset]
+      properties:
+        sol:
+          type: number
+        lmst:
+          type: number
+          description: Местное среднее солнечное время, часы 0..24.
+        elevation:
+          type: number
+          description: Градусы над горизонтом, отрицательное ночью.
+        azimuth:
+          type: number
+          description: Градусы по часовой стрелке от севера.
+        hoursToSunset:
+          type: [number, 'null']
+          description: Часов до заката, null когда Солнце под горизонтом.
+    ApiErrorCode:
+      type: string
+      enum: [OUT_OF_REGION, UNREACHABLE, BAD_REQUEST, NOT_FOUND, INTERNAL]
+    ApiErrorBody:
+      type: object
+      description: Тело любого ответа не 2xx.
+      required: [code, message]
+      properties:
+        code:
+          $ref: '#/components/schemas/ApiErrorCode'
+        message:
+          type: string
+          description: Текст для пользователя, по-русски, с подсказкой что делать дальше.

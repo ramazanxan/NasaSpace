@@ -1,7 +1,8 @@
-import type { LonLat, Route, RouteDebug, RouteRequest, TerrainGrid, TravelMode } from '../types'
+import type { LonLat, Route, RouteDebug, RouteRequest, TerrainGrid } from '../types'
 import { distance, fromGrid, inBBox, toGrid } from '../../map/geo'
 import { slopeGrid } from './terrain'
 import { MockApiError } from './errors'
+import { MODE_LIMITS } from '../modes'
 
 /**
  * Stand-in for the Java router: A* (or Dijkstra) over the terrain grid.
@@ -9,10 +10,6 @@ import { MockApiError } from './errors'
  * built and demoed before the backend is ready.
  */
 
-export const MODE_LIMITS: Record<TravelMode, { maxSlope: number; metresPerSol: number }> = {
-  rover: { maxSlope: 20, metresPerSol: 150 },
-  astronaut: { maxSlope: 30, metresPerSol: 6000 },
-}
 
 const STEP = 2 // search every 2nd sample: 129×129 nodes for a 257 grid
 

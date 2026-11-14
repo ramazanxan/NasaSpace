@@ -1,0 +1,88 @@
+/* Stretches to the height of TerrainControls when it sits beside it in .map-tools. */
+.layers-control {
+  position: relative;
+  display: flex;
+  align-self: stretch;
+}
+
+.layers-control__button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  color: var(--c-text-2);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.layers-control__button:hover,
+.layers-control__button[aria-expanded='true'] {
+  background: var(--c-raised);
+  color: var(--c-text);
+}
+
+.layers-pop {
+  position: absolute;
+  top: calc(100% + var(--s-2));
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  width: 248px;
+  padding: var(--s-2) var(--s-3);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-card);
+}
+
+.layers-pop__note {
+  margin: var(--s-1) 0;
+  font-size: var(--fs-13);
+  color: var(--c-text-3);
+}
+
+.layer-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.layer-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: 0 0 var(--s-2) calc(28px + var(--s-3));
+}
+
+/* legend: data ramp over the raised surface, labels under their stops */
+.layer-legend__bar {
+  height: 8px;
+  border-radius: 2px;
+  background-color: var(--c-raised);
+  box-shadow: inset 0 0 0 1px var(--c-line);
+}
+
+.layer-legend__labels {
+  position: relative;
+  height: 16px;
+  margin-top: var(--s-1);
+  font-size: var(--fs-12);
+  color: var(--c-text-3);
+}
+
+.layer-legend__labels span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.layer-legend__labels span[data-edge='start'] {
+  transform: none;
+}
+
+.layer-legend__labels span[data-edge='end'] {
+  transform: translateX(-100%);
+}
