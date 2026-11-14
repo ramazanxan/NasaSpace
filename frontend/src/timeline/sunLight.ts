@@ -48,7 +48,8 @@ export function useSunLighting(center: LonLat | null, sun: SunState | null) {
     const { scene } = viewer
     const prevLight = scene.light
     const prevLighting = scene.globe.enableLighting
-    setLighting(scene, true, prevLight)
+    // Lighting itself is switched on by the effect below, only once a sun state exists:
+    // Cesium's default SunLight follows the Earth clock and could flash the region dark.
     return () => {
       if (!viewer.isDestroyed()) setLighting(scene, prevLighting, prevLight)
     }

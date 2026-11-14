@@ -1,5 +1,5 @@
 import type { LonLat, Route, RouteDebug, RouteRequest, TerrainGrid } from '../types'
-import { distance, fromGrid, inBBox, toGrid } from '../../map/geo'
+import { MARS_RADIUS_M, distance, fromGrid, inBBox, toGrid } from '../../map/geo'
 import { slopeGrid } from './terrain'
 import { MockApiError } from './errors'
 import { MODE_LIMITS } from '../modes'
@@ -59,17 +59,24 @@ export function searchRoute(t: TerrainGrid, req: RouteRequest, algorithm: 'astar
   const slopes = slopeGrid(t)
   const W = Math.floor((t.width - 1) / STEP) + 1
   const H = Math.floor((t.height - 1) / STEP) + 1
-  const cellSize = t.resolution * STEP
+  const [, south, , north] = t.bbox
+  const cellX = t.resolution * STEP
+  const cellY = (((north - south) / (t.height - 1)) * Math.PI * MARS_RADIUS_M * STEP) / 180
 
   const node = (p: LonLat) => {
     const { col, row } = toGrid(t, p)
-    return Math.round(row / STEP) * W + Math.round(col / STEP)
+    const c = Math.min(W - 1, Math.max(0, Math.round(col / STEP)))
+    const r = Math.min(H - 1, Math.max(0, Math.round(row / STEP)))
+    return r * W + c
   }
   const h = (i: number) => t.heights[Math.floor(i / W) * STEP * t.width + (i % W) * STEP]
   const s = (i: number) => slopes[Math.floor(i / W) * STEP * t.width + (i % W) * STEP]
 
   const start = node(req.from)
   const goal = node(req.to)
+  if (start === goal) {
+    throw new MockApiError(400, 'BAD_REQUEST', 'Точки А и Б слишком близко: отодвиньте одну из них')
+  }
   if (s(start) > maxSlope || s(goal) > maxSlope) {
     throw new MockApiError(422, 'UNREACHABLE', `Точка слишком крутая: больше ${maxSlope}° для этого режима`)
   }
@@ -77,7 +84,7 @@ export function searchRoute(t: TerrainGrid, req: RouteRequest, algorithm: 'astar
   const gx = goal % W
   const gy = Math.floor(goal / W)
   const heuristic = (i: number) =>
-    algorithm === 'astar' ? Math.hypot((i % W) - gx, Math.floor(i / W) - gy) * cellSize : 0
+    algorithm === 'astar' ? Math.hypot(((i % W) - gx) * cellX, (Math.floor(i / W) - gy) * cellY) : 0
 
   const cost = new Float64Array(W * H).fill(Infinity)
   const prev = new Int32Array(W * H).fill(-1)
@@ -104,7 +111,7 @@ export function searchRoute(t: TerrainGrid, req: RouteRequest, algorithm: 'astar
         if (nc < 0 || nr < 0 || nc >= W || nr >= H) continue
         const nb = nr * W + nc
         if (closed[nb] || s(nb) > maxSlope) continue
-        const run = Math.hypot(dx, dy) * cellSize
+        const run = Math.hypot(dx * cellX, dy * cellY)
         const rise = h(nb) - h(cur)
         const grade = Math.abs(rise) / run
         // Climbing costs more than flat ground; steep descents are penalised too.

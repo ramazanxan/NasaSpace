@@ -57,6 +57,8 @@ paths:
                   bbox: [136.9, -5.9, 138.3, -4.3]
                   center: { lon: 137.55, lat: -5.0 }
                   baseHeight: -4500
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/Internal'
   /terrain/{regionId}:
@@ -87,6 +89,8 @@ paths:
                 heights: [-2210, -2214, -2219, -2223]
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/Internal'
   /layers/{regionId}/{kind}:
@@ -122,6 +126,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/Internal'
   /places:
@@ -140,6 +146,7 @@ paths:
           description: Поисковая строка, может быть пустой.
           schema:
             type: string
+            maxLength: 100
           example: Perseverance
         - name: limit
           in: query
@@ -148,6 +155,7 @@ paths:
           schema:
             type: integer
             minimum: 1
+            maximum: 50
             default: 8
       responses:
         '200':
@@ -169,6 +177,8 @@ paths:
                   description: Площадка «Октавия Батлер», где Perseverance сел 18 февраля 2021 года.
         '400':
           $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/Internal'
   /route:
@@ -181,6 +191,9 @@ paths:
         rover до 20 градусов уклона и 150 м за сол; astronaut до 30 градусов и 6000 м за сол.
         stats.sols = length / метры за сол, округление до 0.1.
         Первая и последняя точки маршрута совпадают с from и to из запроса.
+        Если A и B попадают в один узел сетки, ответ 400 BAD_REQUEST
+        «Точки А и Б слишком близко: отодвиньте одну из них».
+        Лимит запросов: около 10 в секунду на IP, иначе 429.
       requestBody:
         required: true
         content:
@@ -218,6 +231,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/RouteUnprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/Internal'
   /route/debug:
@@ -229,7 +244,8 @@ paths:
         Тот же запрос, что /route, плюс порядок раскрытия клеток для визуального сравнения алгоритмов.
         Отличие от /route: если путь не найден, ответ 200 с route: null
         (а не 422 UNREACHABLE). Ошибки OUT_OF_REGION и UNREACHABLE для слишком крутой
-        начальной или конечной точки возвращаются как 422, как и в /route.
+        начальной или конечной точки возвращаются как 422, как и в /route; совпадение узлов A и B даёт 400.
+        Лимит запросов: около 1 в секунду на IP, иначе 429.
       parameters:
         - name: algorithm
           in: query
@@ -268,6 +284,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/RouteUnprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/Internal'
   /trails:
@@ -285,6 +303,7 @@ paths:
           required: true
           schema:
             type: string
+            pattern: '^[a-z0-9-]{1,32}$'
           example: jezero
       responses:
         '200':
@@ -305,6 +324,8 @@ paths:
                     - { lon: 77.92, lat: 18.4 }
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/Internal'
   /sun:
@@ -340,6 +361,8 @@ paths:
           description: Номер сола (число; фронт передаёт его как есть).
           schema:
             type: number
+            minimum: 0
+            maximum: 100000
           example: 120
         - name: hour
           in: query
@@ -365,6 +388,8 @@ paths:
                 hoursToSunset: 3.4
         '400':
           $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/Internal'
 components:
@@ -376,6 +401,7 @@ components:
       description: Идентификатор района из GET /regions (jezero, gale, olympus, melas, utopia, elysium).
       schema:
         type: string
+        pattern: '^[a-z0-9-]{1,32}$'
       example: jezero
   responses:
     BadRequest:
@@ -387,6 +413,20 @@ components:
           example:
             code: BAD_REQUEST
             message: 'Неверный режим. Допустимо: rover или astronaut'
+    TooManyRequests:
+      description: Превышен лимит запросов с одного IP. Фронт показывает message как есть.
+      headers:
+        Retry-After:
+          description: Через сколько секунд повторить.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorBody'
+          example:
+            code: BAD_REQUEST
+            message: Слишком много запросов. Подождите секунду и повторите
     NotFound:
       description: Район (или другой ресурс) не найден.
       content:
@@ -433,9 +473,13 @@ components:
       properties:
         lon:
           type: number
+          minimum: -180
+          maximum: 180
           description: Долгота, градусы, восток положителен, [-180, 180].
         lat:
           type: number
+          minimum: -90
+          maximum: 90
           description: Широта, градусы, [-90, 90].
     BBox:
       type: array
@@ -544,6 +588,7 @@ components:
       properties:
         regionId:
           type: string
+          pattern: '^[a-z0-9-]{1,32}$'
         from:
           $ref: '#/components/schemas/LonLat'
         to:
@@ -608,6 +653,7 @@ components:
           enum: [astar, dijkstra]
         visited:
           type: array
+          maxItems: 100000
           description: Клетки сетки в порядке раскрытия, пары [lon, lat].
           items:
             type: array

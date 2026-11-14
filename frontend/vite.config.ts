@@ -1,11 +1,16 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 const cesiumBuild = 'node_modules/cesium/Build/Cesium'
 
 // Cesium needs its Workers/Assets/Widgets served as static files.
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const apiUrl = loadEnv(mode, process.cwd(), 'VITE_').VITE_API_URL ?? ''
+  if (mode === 'production' && apiUrl && !apiUrl.startsWith('https://')) {
+    throw new Error('VITE_API_URL must use https:// in production builds (mixed content is blocked)')
+  }
+  return {
   plugins: [
     react(),
     viteStaticCopy({
@@ -25,4 +30,5 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 6000,
   },
+  }
 })

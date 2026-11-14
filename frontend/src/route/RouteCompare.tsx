@@ -14,24 +14,24 @@ function compareNote(astar: number, dijkstra: number, la?: number | null, ld?: n
   const cells = ratio >= 1.05 ? `A* просмотрел в ${fmt.deg(ratio)} раза меньше клеток` : 'Оба просмотрели почти столько же клеток'
   if (la == null || ld == null) return cells
   const same = Math.abs(la - ld) <= Math.max(1, ld * 0.01)
-  return same ? `${cells}, путь той же длины` : `${cells}. Длина пути: ${fmt.km(la)} и ${fmt.km(ld)} ${fmt.kmUnit(ld)}`
+  return same ? `${cells}, путь той же длины` : `${cells}. Длина пути: ${fmt.km(la)} ${fmt.kmUnit(la)} и ${fmt.km(ld)} ${fmt.kmUnit(ld)}`
 }
 
 /** A* vs Dijkstra: how many grid cells each one expands to find the same route. */
 export function RouteCompare({ req }: { req: RouteRequest }) {
-  const { status, error, results, playing, reset, set, play } = useCompare()
+  const { status, error, results, playing, reset, set, play, start } = useCompare()
   const { regionId, from, to, mode } = req
 
   // Any change to the request makes old results meaningless.
   useEffect(() => reset, [regionId, from, to, mode, reset])
 
   const run = async () => {
-    set({ status: 'loading', error: null, results: {}, playing: null })
+    const token = start()
+    const current = () => useCompare.getState().runId === token
     const r = { regionId, from, to, mode }
     try {
       const [a, d] = await Promise.all(ALGORITHMS.map((alg) => api.routeDebug(r, alg)))
-      const s = useCompare.getState()
-      if (s.status !== 'loading') return // reset while in flight
+      if (!current()) return // reset or rerun while in flight
       set({
         status: 'ready',
         results: {
@@ -41,7 +41,7 @@ export function RouteCompare({ req }: { req: RouteRequest }) {
       })
       play('astar')
     } catch (e) {
-      if (useCompare.getState().status === 'loading') set({ status: 'error', error: routeErrorMessage(e, mode) })
+      if (current()) set({ status: 'error', error: routeErrorMessage(e, mode) })
     }
   }
 

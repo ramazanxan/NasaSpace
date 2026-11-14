@@ -2,7 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Layers } from 'lucide-react'
 import type { LayerKind } from '../api/types'
 import { useApp } from '../store/useApp'
-import { Slider, Toggle } from '../ui/primitives'
+import { Notice, Slider, Toggle } from '../ui/primitives'
+import { useLayerErrors } from './layerErrors'
 import { RAMPS, rampGradient } from './ramps'
 import './layers.css'
 
@@ -33,10 +34,12 @@ function Legend({ kind }: { kind: LayerKind }) {
 function DataLayer({ kind, label }: { kind: LayerKind; label: string }) {
   const layer = useApp((s) => s.layers[kind])
   const setLayer = useApp((s) => s.setLayer)
+  const error = useLayerErrors((s) => s.errors[kind])
   return (
     <div className="layer-item">
       <Toggle label={label} checked={layer.visible} onChange={(visible) => setLayer(kind, { visible })} />
-      {layer.visible && (
+      {layer.visible && error && <Notice tone="error">{error}</Notice>}
+      {layer.visible && !error && (
         <div className="layer-item__body">
           <Legend kind={kind} />
           <Slider
@@ -66,6 +69,7 @@ export function LayersControl() {
   const showRovers = useApp((s) => s.showRovers)
   const setShowTrails = useApp((s) => s.setShowTrails)
   const setShowRovers = useApp((s) => s.setShowRovers)
+  const trailsError = useLayerErrors((s) => s.errors.trails)
 
   useEffect(() => {
     if (!open) return
@@ -92,6 +96,7 @@ export function LayersControl() {
         ref={buttonRef}
         type="button"
         className="float layers-control__button"
+        aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={popId}
         onClick={() => setOpen((v) => !v)}
@@ -115,6 +120,7 @@ export function LayersControl() {
               <DataLayer kind="slope" label="Уклон" />
               <DataLayer kind="hazard" label="Опасность" />
               <Toggle label="Тропы" checked={showTrails} onChange={setShowTrails} />
+              {showTrails && trailsError && <Notice tone="error">{trailsError}</Notice>}
             </>
           ) : (
             <p className="layers-pop__note">Уклон, опасность и тропы видны внутри района. Откройте район в списке слева.</p>

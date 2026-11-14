@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import type { LayerKind } from '../api/types'
 import { useViewer } from '../map/viewerRef'
 import { useApp } from '../store/useApp'
+import { LAYER_ERROR_TEXT, useLayerErrors } from './layerErrors'
 import { createOverlayLayer, loadOverlay } from './overlay'
 import { ROVERS, roverEntity } from './rovers'
 
@@ -18,6 +19,8 @@ function useOverlay(kind: LayerKind) {
   const layerRef = useRef<ImageryLayer | null>(null)
 
   useEffect(() => {
+    const { setError } = useLayerErrors.getState()
+    setError(kind, null)
     if (!viewer || !regionId || !visible) return
     let cancelled = false
     loadOverlay(regionId, kind).then(
@@ -28,7 +31,10 @@ function useOverlay(kind: LayerKind) {
         layerRef.current = layer
         viewer.scene.requestRender()
       },
-      (e) => console.error(`layer ${kind}`, e),
+      (e) => {
+        console.error(`layer ${kind}`, e)
+        if (!cancelled) setError(kind, LAYER_ERROR_TEXT[kind])
+      },
     )
     return () => {
       cancelled = true
@@ -55,6 +61,8 @@ function useTrails() {
   const show = useApp((s) => s.showTrails)
 
   useEffect(() => {
+    const { setError } = useLayerErrors.getState()
+    setError('trails', null)
     if (!viewer || !regionId || !show) return
     let cancelled = false
     const added: Entity[] = []
@@ -62,6 +70,8 @@ function useTrails() {
       (trails) => {
         if (cancelled || viewer.isDestroyed()) return
         for (const t of trails) {
+          // A duplicate id (repeated trail in the response) is skipped instead of throwing.
+          if (viewer.entities.getById(`trail:${t.id}`)) continue
           added.push(
             viewer.entities.add({
               id: `trail:${t.id}`,
@@ -80,7 +90,10 @@ function useTrails() {
         }
         viewer.scene.requestRender()
       },
-      (e) => console.error('trails', e),
+      (e) => {
+        console.error('trails', e)
+        if (!cancelled) setError('trails', LAYER_ERROR_TEXT.trails)
+      },
     )
     return () => {
       cancelled = true

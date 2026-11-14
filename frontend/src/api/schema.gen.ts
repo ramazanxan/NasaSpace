@@ -105,6 +105,9 @@ export interface paths {
          *     rover до 20 градусов уклона и 150 м за сол; astronaut до 30 градусов и 6000 м за сол.
          *     stats.sols = length / метры за сол, округление до 0.1.
          *     Первая и последняя точки маршрута совпадают с from и to из запроса.
+         *     Если A и B попадают в один узел сетки, ответ 400 BAD_REQUEST
+         *     «Точки А и Б слишком близко: отодвиньте одну из них».
+         *     Лимит запросов: около 10 в секунду на IP, иначе 429.
          */
         post: operations["buildRoute"];
         delete?: never;
@@ -127,7 +130,8 @@ export interface paths {
          * @description Тот же запрос, что /route, плюс порядок раскрытия клеток для визуального сравнения алгоритмов.
          *     Отличие от /route: если путь не найден, ответ 200 с route: null
          *     (а не 422 UNREACHABLE). Ошибки OUT_OF_REGION и UNREACHABLE для слишком крутой
-         *     начальной или конечной точки возвращаются как 422, как и в /route.
+         *     начальной или конечной точки возвращаются как 422, как и в /route; совпадение узлов A и B даёт 400.
+         *     Лимит запросов: около 1 в секунду на IP, иначе 429.
          */
         post: operations["buildRouteDebug"];
         delete?: never;
@@ -330,6 +334,23 @@ export interface components {
                 "application/json": components["schemas"]["ApiErrorBody"];
             };
         };
+        /** @description Превышен лимит запросов с одного IP. Фронт показывает message как есть. */
+        TooManyRequests: {
+            headers: {
+                /** @description Через сколько секунд повторить. */
+                "Retry-After"?: number;
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "code": "BAD_REQUEST",
+                 *       "message": "Слишком много запросов. Подождите секунду и повторите"
+                 *     }
+                 */
+                "application/json": components["schemas"]["ApiErrorBody"];
+            };
+        };
         /** @description Район (или другой ресурс) не найден. */
         NotFound: {
             headers: {
@@ -441,6 +462,7 @@ export interface operations {
                     "application/json": components["schemas"]["Region"][];
                 };
             };
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["Internal"];
         };
     };
@@ -489,6 +511,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["Internal"];
         };
     };
@@ -539,6 +562,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["Internal"];
         };
     };
@@ -586,6 +610,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["Internal"];
         };
     };
@@ -664,6 +689,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["RouteUnprocessable"];
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["Internal"];
         };
     };
@@ -728,6 +754,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["RouteUnprocessable"];
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["Internal"];
         };
     };
@@ -776,6 +803,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["Internal"];
         };
     };
@@ -828,6 +856,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["Internal"];
         };
     };

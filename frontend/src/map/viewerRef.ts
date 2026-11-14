@@ -20,14 +20,15 @@ export function getViewer(): Viewer | null {
 }
 
 /** React hook: the viewer once it exists, otherwise null. */
+function subscribe(cb: () => void) {
+  listeners.add(cb)
+  return () => {
+    listeners.delete(cb)
+  }
+}
+
 export function useViewer(): Viewer | null {
-  return useSyncExternalStore(
-    (cb) => {
-      listeners.add(cb)
-      return () => listeners.delete(cb)
-    },
-    () => viewer,
-  )
+  return useSyncExternalStore(subscribe, () => viewer)
 }
 
 export interface MapPointerEvent {
@@ -51,6 +52,10 @@ export function onMapClick(h: Handler): () => void {
 export function onMapMove(h: Handler): () => void {
   moveHandlers.add(h)
   return () => moveHandlers.delete(h)
+}
+
+export function hasMoveHandlers(): boolean {
+  return moveHandlers.size > 0
 }
 
 export function emitClick(e: MapPointerEvent) {

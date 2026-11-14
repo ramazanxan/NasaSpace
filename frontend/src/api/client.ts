@@ -34,15 +34,23 @@ export class ApiError extends Error {
   }
 }
 
+const TIMEOUT_MS = 15_000
+const ERROR_CODES = new Set<ApiErrorCode>(['OUT_OF_REGION', 'UNREACHABLE', 'BAD_REQUEST', 'NOT_FOUND', 'INTERNAL'])
+
 async function http<T>(path: string, init?: RequestInit & { signal?: AbortSignal }): Promise<T> {
+  const timeout = AbortSignal.timeout(TIMEOUT_MS)
+  const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout
   let res: Response
   try {
     res = await fetch(`${BASE}${path}`, {
       ...init,
+      signal,
       headers: { Accept: 'application/json', ...(init?.body ? { 'Content-Type': 'application/json' } : {}) },
     })
   } catch (e) {
-    if ((e as Error).name === 'AbortError') throw e
+    // The caller cancelled: let it see the abort. Our own timeout becomes a readable error.
+    if (init?.signal?.aborted) throw e
+    if (timeout.aborted) throw new ApiError(0, 'INTERNAL', 'Сервер маршрутов не ответил за 15 секунд. Повторите позже')
     throw new ApiError(0, 'INTERNAL', 'Сервер маршрутов не отвечает. Проверьте, что бэкенд запущен')
   }
   if (!res.ok) {
@@ -52,9 +60,15 @@ async function http<T>(path: string, init?: RequestInit & { signal?: AbortSignal
     } catch {
       // non-JSON error body
     }
-    throw new ApiError(res.status, body.code ?? 'INTERNAL', body.message ?? `Ошибка сервера (${res.status})`)
+    const code = body.code && ERROR_CODES.has(body.code) ? body.code : 'INTERNAL'
+    const message = typeof body.message === 'string' && body.message ? body.message.slice(0, 300) : `Ошибка сервера (${res.status})`
+    throw new ApiError(res.status, code, message)
   }
-  return (await res.json()) as T
+  try {
+    return (await res.json()) as T
+  } catch {
+    throw new ApiError(res.status, 'INTERNAL', 'Сервер вернул некорректный ответ')
+  }
 }
 
 async function viaMock<T>(fn: () => Promise<T>): Promise<T> {

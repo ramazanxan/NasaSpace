@@ -16,6 +16,26 @@ interface Painted {
 
 const cache = new Map<string, Promise<Painted>>()
 
+const isSize = (n: unknown) => Number.isInteger(n) && (n as number) >= 2 && (n as number) <= 2049
+
+/** Reject malformed grids before they reach the canvas (bad backend data, wrong endpoint). */
+function checkGrid(grid: LayerGrid, kind: LayerKind): LayerGrid {
+  const ok =
+    grid !== null &&
+    typeof grid === 'object' &&
+    grid.kind === kind &&
+    Object.hasOwn(RAMPS, grid.kind) &&
+    isSize(grid.width) &&
+    isSize(grid.height) &&
+    Array.isArray(grid.values) &&
+    grid.values.length === grid.width * grid.height &&
+    Array.isArray(grid.bbox) &&
+    grid.bbox.length === 4 &&
+    grid.bbox.every(Number.isFinite)
+  if (!ok) throw new Error(`Некорректная сетка слоя ${kind}`)
+  return grid
+}
+
 function paint(grid: LayerGrid): string {
   const canvas = document.createElement('canvas')
   canvas.width = grid.width
@@ -42,7 +62,10 @@ export function loadOverlay(regionId: string, kind: LayerKind): Promise<Painted>
   const key = `${regionId}:${kind}`
   let p = cache.get(key)
   if (!p) {
-    p = api.layer(regionId, kind).then((grid) => ({ grid, url: paint(grid) }))
+    p = api.layer(regionId, kind).then((raw) => {
+      const grid = checkGrid(raw, kind)
+      return { grid, url: paint(grid) }
+    })
     p.catch(() => cache.delete(key))
     cache.set(key, p)
   }

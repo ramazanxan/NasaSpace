@@ -67,11 +67,21 @@ export const useApp = create<AppState>((set) => ({
   exaggeration: 2,
   setRegions: (regions) => set({ regions }),
   setActiveRegion: (activeRegionId) =>
-    set((s) =>
-      s.activeRegionId === activeRegionId
-        ? {}
-        : { activeRegionId, from: null, to: null, route: null, routeStatus: 'idle', routeError: null, hoverIndex: null },
-    ),
+    set((s) => {
+      if (s.activeRegionId === activeRegionId) return {}
+      if (activeRegionId && !s.regions.some((r) => r.id === activeRegionId)) return {}
+      return {
+        activeRegionId,
+        selectedPlace: s.selectedPlace?.regionId === activeRegionId ? s.selectedPlace : null,
+        from: null,
+        to: null,
+        pick: null,
+        route: null,
+        routeStatus: 'idle',
+        routeError: null,
+        hoverIndex: null,
+      }
+    }),
   putTerrain: (t) => set((s) => ({ terrain: { ...s.terrain, [t.regionId]: t } })),
   setExaggeration: (exaggeration) => set({ exaggeration }),
 

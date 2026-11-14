@@ -17,7 +17,7 @@ import {
   type PointPrimitive,
   type Viewer,
 } from 'cesium'
-import type { LonLat } from '../api/types'
+import type { BBox, LonLat } from '../api/types'
 import { sample } from '../map/geo'
 import { displayHeight } from '../map/terrain'
 import { onMapClick, useViewer } from '../map/viewerRef'
@@ -225,30 +225,54 @@ function useHoverMarker(viewer: Viewer | null) {
   }, [viewer, route, hoverIndex])
 }
 
+/** Same edge blend as map/terrain.ts, so replay points sit on the shown surface. */
+const EDGE_FADE = 0.08
+function edgeMask([w, s, e, n]: BBox, { lon, lat }: LonLat): number {
+  const u = Math.min(lon - w, e - lon) / (e - w)
+  const v = Math.min(lat - s, n - lat) / (n - s)
+  const k = Math.min(u, v) / EDGE_FADE
+  if (k >= 1) return 1
+  if (k <= 0) return 0
+  return k * k * (3 - 2 * k)
+}
+
+const MAX_REPLAY_POINTS = 100_000
+const REPLAY_LIFT = 30
+
+interface Replay {
+  pts: PointPrimitive[]
+  cells: LonLat[]
+  /** Displayed height before vertical exaggeration, per cell. */
+  base: number[]
+}
+
 /** Replays the cells an algorithm expanded, in the order it expanded them. */
 function useSearchReplay(viewer: Viewer | null) {
   const playing = useCompare((s) => s.playing)
   const playId = useCompare((s) => s.playId)
   const results = useCompare((s) => s.results)
+  const exaggeration = useApp((s) => s.exaggeration)
+  const replay = useRef<Replay | null>(null)
 
   useEffect(() => {
     const visited = playing ? results[playing]?.visited : undefined
     if (!viewer || !visited?.length) return
-    const { terrain, regions, activeRegionId, exaggeration } = useApp.getState()
+    const { terrain, regions, activeRegionId, exaggeration: x } = useApp.getState()
     const grid = activeRegionId ? terrain[activeRegionId] : undefined
     const region = regions.find((r) => r.id === activeRegionId)
-    const lift = (p: LonLat) => {
+    const cells: LonLat[] = visited.slice(0, MAX_REPLAY_POINTS).map(([lon, lat]) => ({ lon, lat }))
+    const base = cells.map((p) => {
       if (!grid || !region) return 0
       const h = sample(grid, grid.heights, p)
-      return Number.isNaN(h) ? 0 : displayHeight(region, h) * exaggeration + 30
-    }
+      return Number.isNaN(h) ? 0 : displayHeight(region, h) * edgeMask(grid.bbox, p)
+    })
 
     const c = palette()
     const color = (playing === 'astar' ? c.text : c.text3).withAlpha(0.75)
     const collection = new PointPrimitiveCollection()
-    const pts: PointPrimitive[] = visited.map(([lon, lat]) =>
+    const pts: PointPrimitive[] = cells.map((p, i) =>
       collection.add({
-        position: at({ lon, lat }, lift({ lon, lat })),
+        position: at(p, base[i] * x + REPLAY_LIFT),
         pixelSize: 3,
         color,
         show: false,
@@ -256,6 +280,7 @@ function useSearchReplay(viewer: Viewer | null) {
       }),
     )
     viewer.scene.primitives.add(collection)
+    replay.current = { pts, cells, base }
 
     let frame = 0
     let shown = 0
@@ -278,11 +303,22 @@ function useSearchReplay(viewer: Viewer | null) {
 
     return () => {
       cancelAnimationFrame(frame)
+      replay.current = null
       if (viewer.isDestroyed()) return
       viewer.scene.primitives.remove(collection) // also destroys it
       viewer.scene.requestRender()
     }
   }, [viewer, playing, playId, results])
+
+  // Follow the relief slider without restarting the replay.
+  useEffect(() => {
+    const r = replay.current
+    if (!viewer || !r) return
+    r.pts.forEach((pt, i) => {
+      pt.position = at(r.cells[i], r.base[i] * exaggeration + REPLAY_LIFT)
+    })
+    viewer.scene.requestRender()
+  }, [viewer, exaggeration])
 }
 
 /** Route markers, line, profile hover and search replay on the globe. Renders nothing in the DOM. */

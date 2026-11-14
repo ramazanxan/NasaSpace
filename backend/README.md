@@ -71,24 +71,29 @@ public record ApiErrorBody(String code, String message) {}
 
 ## CORS
 
-Разрешить origin фронта на Vercel и `http://localhost:5173`, методы GET/POST/OPTIONS, заголовок Content-Type.
-Адреса вынесите в конфиг:
+Разрешить: точный домен проекта на Vercel, превью-деплои только этого проекта по шаблону
+(например, `https://nasaspace-*-<team>.vercel.app`) и `http://localhost:5173`.
+**Не** разрешайте `*.vercel.app` целиком. Методы GET/POST/OPTIONS, заголовки Content-Type/Accept, `allowCredentials(false)`.
+Если появится авторизация, только точные origins. Значения вынесите в конфиг:
 
 ```java
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
-    @Value("${nasaspace.cors.origins:http://localhost:5173}")
-    private String[] origins; // добавьте адрес Vercel через переменную окружения
+    @Value("${nasaspace.cors.origin-patterns:http://localhost:5173}")
+    private String[] originPatterns; // https://nasaspace.vercel.app, https://nasaspace-*-<team>.vercel.app
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins(origins)
+                .allowedOriginPatterns(originPatterns)
                 .allowedMethods("GET", "POST", "OPTIONS")
-                .allowedHeaders("Content-Type", "Accept");
+                .allowedHeaders("Content-Type", "Accept")
+                .allowCredentials(false);
     }
 }
 ```
+
+Фронт в продакшне должен ходить на бэкенд по `https://` (`VITE_API_URL`).
 
 ## Сетки в памяти (без БД)
 
@@ -118,6 +123,19 @@ rover 20 градусов / 150 м за сол и astronaut 30 градусов 
 
 Алгоритм можно улучшить, но контракт ответа (поля, единицы, ошибки) менять нельзя без правки
 `frontend/src/api/types.ts` и `docs/openapi.yaml` одновременно.
+
+## Безопасность и лимиты
+
+Подробный список: раздел 7 в [`docs/API.md`](../docs/API.md). Кратко:
+
+- Bean Validation на DTO (`@Valid`, `@DecimalMin/@DecimalMax`, `@Pattern("^[a-z0-9-]{1,32}$")` для `regionId`,
+  `@Size`/`@Min`/`@Max` для `q` и `limit`); границы как в `docs/openapi.yaml`.
+- `Semaphore` на параллельные поиски маршрута, таймаут одного поиска, кэш по `(region, округлённые from/to, mode)`.
+- Rate limit по IP (например, Bucket4j): около 10 запросов/с на `/route`, 1 запрос/с на `/route/debug`; ответ 429.
+- Отклонять POST с телом больше 4 КБ (`server.tomcat.max-swallow-size`, фильтр по `Content-Length`).
+- `server.error.include-stacktrace=never`; не возвращать сырой ввод в `message`.
+- Swagger UI и `/v3/api-docs` в продакшне отключить или оставить сознательно для демо; actuator не открывать без ограничений.
+- Access-логи без тел запросов.
 
 ## Проверка совместимости
 

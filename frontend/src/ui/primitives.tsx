@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, KeyboardEvent, ReactNode } from 'react'
 import './primitives.css'
 
 /**
@@ -47,14 +47,26 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void
   label: string
 }) {
+  // Radio-group keyboard pattern: one tab stop, arrows move the selection.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0
+    if (!step) return
+    e.preventDefault()
+    const i = options.findIndex((o) => o.value === value)
+    const next = options[(i + step + options.length) % options.length]
+    onChange(next.value)
+    const buttons = e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+    buttons[options.indexOf(next)]?.focus()
+  }
   return (
-    <div className="segmented" role="radiogroup" aria-label={label}>
+    <div className="segmented" role="radiogroup" aria-label={label} onKeyDown={onKeyDown}>
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           role="radio"
           aria-checked={value === o.value}
+          tabIndex={value === o.value ? 0 : -1}
           className="segmented__item"
           onClick={() => onChange(o.value)}
         >
@@ -86,13 +98,15 @@ export function Slider({
   hideLabel?: boolean
 }) {
   return (
-    <label className="slider">
-      <span className={`slider__head ${hideLabel ? 'sr-only' : ''}`}>
+    <div className="slider">
+      <span className={`slider__head ${hideLabel ? 'sr-only' : ''}`} aria-hidden>
         <span>{label}</span>
         <output>{format(value)}</output>
       </span>
       <input
         type="range"
+        aria-label={label}
+        aria-valuetext={format(value)}
         min={min}
         max={max}
         step={step}
@@ -100,7 +114,7 @@ export function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         style={{ ['--fill' as string]: `${((value - min) / (max - min)) * 100}%` }}
       />
-    </label>
+    </div>
   )
 }
 

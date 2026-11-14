@@ -17,7 +17,7 @@ import 'cesium/Build/Cesium/Widgets/widgets.css'
 import { api } from '../api/client'
 import { useApp } from '../store/useApp'
 import { createTerrainProvider, marsTilingScheme } from './terrain'
-import { emitClick, emitMove, setViewer, useViewer, type MapPointerEvent } from './viewerRef'
+import { emitClick, emitMove, hasMoveHandlers, onMapClick, setViewer, useViewer, type MapPointerEvent } from './viewerRef'
 import { flyHome, flyToRegion } from './camera'
 import { REGION_ENTITY_PREFIX, useRegionOutlines } from './regionOutlines'
 
@@ -126,7 +126,7 @@ export function MarsViewer() {
 
     let frame = 0
     handler.setInputAction((e: ScreenSpaceEventHandler.MotionEvent) => {
-      if (frame) return
+      if (frame || !hasMoveHandlers()) return
       frame = requestAnimationFrame(() => {
         frame = 0
         if (!viewer.isDestroyed()) emitMove(pointerEvent(viewer, e.endPosition))
@@ -151,20 +151,18 @@ export function MarsViewer() {
     api.regions().then(useApp.getState().setRegions, (e) => console.error('regions', e))
   }, [])
 
-  // Clicking a region outline opens it.
-  useEffect(() => {
-    const viewer = viewerRef.current
-    if (!viewer) return
-    const handler = new ScreenSpaceEventHandler(viewer.scene.canvas)
-    handler.setInputAction((e: ScreenSpaceEventHandler.PositionedEvent) => {
-      const picked = viewer.scene.pick(e.position) as { id?: Entity } | undefined
-      const id = picked?.id?.id
-      if (typeof id === 'string' && id.startsWith(REGION_ENTITY_PREFIX) && !useApp.getState().activeRegionId) {
-        useApp.getState().setActiveRegion(id.slice(REGION_ENTITY_PREFIX.length))
-      }
-    }, ScreenSpaceEventType.LEFT_CLICK)
-    return () => handler.destroy()
-  }, [])
+  // Clicking a region frame or its name opens it (overview only).
+  useEffect(
+    () =>
+      onMapClick(({ entityId }) => {
+        if (!entityId?.startsWith(REGION_ENTITY_PREFIX)) return
+        const s = useApp.getState()
+        if (s.activeRegionId) return
+        const id = entityId.slice(REGION_ENTITY_PREFIX.length).replace(/:label$/, '')
+        if (s.regions.some((r) => r.id === id)) s.setActiveRegion(id)
+      }),
+    [],
+  )
 
   const sharedViewer = useViewer()
   useRegionOutlines(sharedViewer, regions, activeRegionId)
