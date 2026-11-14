@@ -110,7 +110,13 @@ export interface Route {
 }
 
 /** Error body for every non-2xx response. */
-export type ApiErrorCode = 'OUT_OF_REGION' | 'UNREACHABLE' | 'BAD_REQUEST' | 'NOT_FOUND' | 'INTERNAL'
+export type ApiErrorCode =
+  | 'OUT_OF_REGION'
+  | 'UNREACHABLE'
+  | 'BAD_REQUEST'
+  | 'NOT_FOUND'
+  | 'TOO_MANY_REQUESTS'
+  | 'INTERNAL'
 
 export interface ApiErrorBody {
   code: ApiErrorCode

@@ -35,7 +35,7 @@ export class ApiError extends Error {
 }
 
 const TIMEOUT_MS = 15_000
-const ERROR_CODES = new Set<ApiErrorCode>(['OUT_OF_REGION', 'UNREACHABLE', 'BAD_REQUEST', 'NOT_FOUND', 'INTERNAL'])
+const ERROR_CODES = new Set<ApiErrorCode>(['OUT_OF_REGION', 'UNREACHABLE', 'BAD_REQUEST', 'NOT_FOUND', 'TOO_MANY_REQUESTS', 'INTERNAL'])
 
 async function http<T>(path: string, init?: RequestInit & { signal?: AbortSignal }): Promise<T> {
   const timeout = AbortSignal.timeout(TIMEOUT_MS)

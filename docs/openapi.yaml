@@ -425,7 +425,7 @@ components:
           schema:
             $ref: '#/components/schemas/ApiErrorBody'
           example:
-            code: BAD_REQUEST
+            code: TOO_MANY_REQUESTS
             message: Слишком много запросов. Подождите секунду и повторите
     NotFound:
       description: Район (или другой ресурс) не найден.
@@ -700,7 +700,7 @@ components:
           description: Часов до заката, null когда Солнце под горизонтом.
     ApiErrorCode:
       type: string
-      enum: [OUT_OF_REGION, UNREACHABLE, BAD_REQUEST, NOT_FOUND, INTERNAL]
+      enum: [OUT_OF_REGION, UNREACHABLE, BAD_REQUEST, NOT_FOUND, INTERNAL, TOO_MANY_REQUESTS]
     ApiErrorBody:
       type: object
       description: Тело любого ответа не 2xx.
