@@ -62,7 +62,7 @@ export function roverEntity(r: Rover): Entity.ConstructorOptions {
     },
     label: {
       text: r.name,
-      font: '500 12px "Schibsted Grotesk", system-ui, sans-serif',
+      font: '500 12px "Geologica", system-ui, sans-serif',
       fillColor: LABEL,
       outlineColor: LABEL_OUTLINE,
       outlineWidth: 3,

@@ -27,6 +27,39 @@ Ellipsoid.default = Ellipsoid.MARS
 const TREK = 'https://trek.nasa.gov/tiles/Mars/EQ'
 /** Viking colour mosaic, 232 m/px. Public NASA tiles with CORS enabled. */
 const MARS_IMAGERY = `${TREK}/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg`
+/** MRO CTX greyscale mosaic, ~5 m/px, 512 px tiles. Published through Mars Trek (Esri Astro), CORS enabled. */
+const MARS_CTX = 'https://astro.arcgis.com/arcgis/rest/services/OnMars/CTX/MapServer/tile/{z}/{y}/{x}'
+
+const vikingProvider = () =>
+  new UrlTemplateImageryProvider({
+    url: MARS_IMAGERY,
+    tilingScheme: marsTilingScheme(),
+    maximumLevel: 7,
+    credit: 'NASA/JPL Mars Trek · Viking MDIM 2.1',
+  })
+
+/**
+ * Close up, the 232 m Viking colour mosaic turns to mush. Above it we lay the
+ * 5 m CTX greyscale mosaic, then Viking again at low alpha to bring the colour
+ * back. Both extra layers appear only once the camera is near the ground.
+ */
+function addDetailImagery(viewer: Viewer) {
+  const layers = viewer.imageryLayers
+  const ctx = new ImageryLayer(
+    new UrlTemplateImageryProvider({
+      url: MARS_CTX,
+      tilingScheme: marsTilingScheme(),
+      tileWidth: 512,
+      tileHeight: 512,
+      maximumLevel: 12,
+      credit: 'NASA/JPL/MSSS · MRO CTX mosaic (Caltech Murray Lab), via Mars Trek',
+    }),
+    { minimumTerrainLevel: 6, brightness: 1.05, contrast: 1.1 },
+  )
+  const tint = new ImageryLayer(vikingProvider(), { minimumTerrainLevel: 6, alpha: 0.5 })
+  layers.add(ctx)
+  layers.add(tint)
+}
 
 function pointerEvent(viewer: Viewer, pos: Cartesian2): MapPointerEvent {
   const picked = viewer.scene.pick(pos) as { id?: Entity } | undefined
@@ -50,14 +83,7 @@ export function MarsViewer() {
   useEffect(() => {
     if (!host.current) return
     const viewer = new Viewer(host.current, {
-      baseLayer: new ImageryLayer(
-        new UrlTemplateImageryProvider({
-          url: MARS_IMAGERY,
-          tilingScheme: marsTilingScheme(),
-          maximumLevel: 7,
-          credit: 'NASA/JPL Mars Trek · Viking MDIM 2.1',
-        }),
-      ),
+      baseLayer: new ImageryLayer(vikingProvider()),
       terrainProvider: createTerrainProvider([]),
       animation: false,
       timeline: false,
@@ -74,6 +100,7 @@ export function MarsViewer() {
       maximumRenderTimeChange: Infinity,
     })
 
+    addDetailImagery(viewer)
     const { scene } = viewer
     scene.backgroundColor = Color.fromCssColorString('#0e1014')
     scene.globe.baseColor = Color.fromCssColorString('#6b3a24')

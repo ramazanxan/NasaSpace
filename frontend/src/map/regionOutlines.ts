@@ -42,7 +42,7 @@ export function useRegionOutlines(viewer: Viewer | null, regions: Region[], acti
           position: Cartesian3.fromDegrees(w, n, 0, Ellipsoid.MARS),
           label: {
             text: r.name,
-            font: '500 13px "Schibsted Grotesk", system-ui, sans-serif',
+            font: '500 13px "Geologica", system-ui, sans-serif',
             fillColor: Color.fromCssColorString('#ece8e1'),
             outlineColor: Color.fromCssColorString('#14161a').withAlpha(0.8),
             outlineWidth: 3,

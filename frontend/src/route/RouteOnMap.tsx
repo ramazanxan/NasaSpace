@@ -91,7 +91,7 @@ function useMarkers(viewer: Viewer | null) {
           },
           label: {
             text: POINT_LABEL[which],
-            font: '600 13px "Schibsted Grotesk", system-ui, sans-serif',
+            font: '600 13px "Geologica", system-ui, sans-serif',
             fillColor: c.text,
             outlineColor: c.ground.withAlpha(0.85),
             outlineWidth: 3,
@@ -175,7 +175,8 @@ function useRouteLine(viewer: Viewer | null) {
   useEffect(() => {
     if (!viewer || !route || route.points.length < 2) return
     const sphere = BoundingSphere.fromPoints(route.points.map((p) => at(p)))
-    const range = Math.max(4000, sphere.radius * 2.8)
+    // Side panels cover ~half the width, so frame wider than the bare fit.
+    const range = Math.max(5000, sphere.radius * 3.8)
     viewer.camera.flyToBoundingSphere(sphere, {
       offset: new HeadingPitchRange(viewer.camera.heading, CMath.toRadians(-48), range),
       duration: prefersReducedMotion() ? 0 : 1.6,
