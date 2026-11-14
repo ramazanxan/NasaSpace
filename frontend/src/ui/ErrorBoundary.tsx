@@ -16,10 +16,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
     if (!this.state.failed) return this.props.children
     return (
       <main className="crash">
-        <p className="crash__title">Карта не смогла отрисоваться</p>
-        <p className="muted">Обновите страницу. Если ошибка повторяется, откройте другой район.</p>
+        <p className="crash__title">The map could not be drawn</p>
+        <p className="muted">Reload the page. If the error persists, open a different region.</p>
         <button type="button" className="btn btn--primary" onClick={() => location.reload()}>
-          Обновить страницу
+          Reload page
         </button>
       </main>
     )

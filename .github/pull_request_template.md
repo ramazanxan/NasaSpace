@@ -1,9 +1,9 @@
-## Что сделано
+## What changed
 
 
-## Как проверить
+## How to test
 
 
-## Чеклист
-- [ ] Проверил локально
-- [ ] Нет секретов в коде
+## Checklist
+- [ ] Tested locally
+- [ ] No secrets in the code

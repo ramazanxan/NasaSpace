@@ -50,8 +50,8 @@ async function http<T>(path: string, init?: RequestInit & { signal?: AbortSignal
   } catch (e) {
     // The caller cancelled: let it see the abort. Our own timeout becomes a readable error.
     if (init?.signal?.aborted) throw e
-    if (timeout.aborted) throw new ApiError(0, 'INTERNAL', 'Сервер маршрутов не ответил за 15 секунд. Повторите позже')
-    throw new ApiError(0, 'INTERNAL', 'Сервер маршрутов не отвечает. Проверьте, что бэкенд запущен')
+    if (timeout.aborted) throw new ApiError(0, 'INTERNAL', 'The route server did not respond within 15 seconds. Try again later')
+    throw new ApiError(0, 'INTERNAL', 'The route server is not responding. Check that the backend is running')
   }
   if (!res.ok) {
     let body: Partial<ApiErrorBody> = {}
@@ -61,13 +61,13 @@ async function http<T>(path: string, init?: RequestInit & { signal?: AbortSignal
       // non-JSON error body
     }
     const code = body.code && ERROR_CODES.has(body.code) ? body.code : 'INTERNAL'
-    const message = typeof body.message === 'string' && body.message ? body.message.slice(0, 300) : `Ошибка сервера (${res.status})`
+    const message = typeof body.message === 'string' && body.message ? body.message.slice(0, 300) : `Server error (${res.status})`
     throw new ApiError(res.status, code, message)
   }
   try {
     return (await res.json()) as T
   } catch {
-    throw new ApiError(res.status, 'INTERNAL', 'Сервер вернул некорректный ответ')
+    throw new ApiError(res.status, 'INTERNAL', 'The server returned an invalid response')
   }
 }
 

@@ -55,10 +55,10 @@ export function goToPlace(place: Place) {
 }
 
 export const PLACE_KIND_LABEL: Record<Place['kind'], string> = {
-  'landing-site': 'Место посадки',
-  crater: 'Кратер',
-  mountain: 'Гора',
-  canyon: 'Каньон',
-  plain: 'Равнина',
-  feature: 'Форма рельефа',
+  'landing-site': 'Landing site',
+  crater: 'Crater',
+  mountain: 'Mountain',
+  canyon: 'Canyon',
+  plain: 'Plain',
+  feature: 'Landform',
 }

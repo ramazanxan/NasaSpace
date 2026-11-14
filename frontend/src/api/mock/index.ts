@@ -23,7 +23,7 @@ const latency = (ms = 120) => new Promise((r) => setTimeout(r, ms + Math.random(
 
 function region(id: string): MockRegion {
   const r = MOCK_REGIONS.find((x) => x.id === id)
-  if (!r) throw new MockApiError(404, 'NOT_FOUND', `Район ${id} не найден`)
+  if (!r) throw new MockApiError(404, 'NOT_FOUND', `Region ${id} not found`)
   return r
 }
 
@@ -100,7 +100,7 @@ export const mockApi = {
   async route(req: RouteRequest): Promise<Route> {
     await latency(250)
     const res = searchRoute(mockTerrain(region(req.regionId)), req)
-    if (!res.route) throw new MockApiError(422, 'UNREACHABLE', 'Цель недостижима: путь перекрыт слишком крутыми склонами')
+    if (!res.route) throw new MockApiError(422, 'UNREACHABLE', 'Target unreachable: steep slopes block every path')
     return res.route
   },
 
@@ -127,7 +127,7 @@ export const mockApi = {
       try {
         const res = searchRoute(t, { regionId, from: a, to: b, mode: 'astronaut' })
         if (res.route) {
-          trails.push({ id: `${regionId}-t${i}`, regionId, name: `Тропа ${i + 1}`, points: res.route.points.map(({ lon, lat }) => ({ lon, lat })) })
+          trails.push({ id: `${regionId}-t${i}`, regionId, name: `Trail ${i + 1}`, points: res.route.points.map(({ lon, lat }) => ({ lon, lat })) })
         }
       } catch {
         // a leg that starts on a cliff is simply skipped

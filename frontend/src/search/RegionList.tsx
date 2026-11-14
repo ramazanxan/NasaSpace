@@ -11,10 +11,10 @@ export function RegionList() {
 
   if (active) {
     return (
-      <section className="section" aria-label="Текущий район">
+      <section className="section" aria-label="Current region">
         <div className="regions__current">
           <div className="regions__text">
-            <span className="regions__label">Район</span>
+            <span className="regions__label">Region</span>
             <span className="regions__name">{active.name}</span>
           </div>
           <Button
@@ -25,7 +25,7 @@ export function RegionList() {
               setActiveRegion(null)
             }}
           >
-            Весь Марс
+            All of Mars
           </Button>
         </div>
       </section>
@@ -35,10 +35,10 @@ export function RegionList() {
   return (
     <section className="section" aria-labelledby="regions-title">
       <h2 id="regions-title" className="section__title">
-        Районы
+        Regions
       </h2>
       {regions.length === 0 ? (
-        <p className="regions__summary">Загружаем районы…</p>
+        <p className="regions__summary">Loading regions…</p>
       ) : (
         <ul className="regions__list">
           {regions.map((r) => (

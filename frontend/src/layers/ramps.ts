@@ -30,9 +30,9 @@ export const RAMPS: Record<LayerKind, RampStop[]> = {
     { at: 30, rgb: DEEP_RED, alpha: 1, label: '30°+' },
   ],
   hazard: [
-    { at: 0, rgb: OCHRE, alpha: 0, label: 'низкая' },
-    { at: 0.5, rgb: OCHRE, alpha: 0.75, label: 'средняя' },
-    { at: 1, rgb: DANGER, alpha: 1, label: 'высокая' },
+    { at: 0, rgb: OCHRE, alpha: 0, label: 'low' },
+    { at: 0.5, rgb: OCHRE, alpha: 0.75, label: 'medium' },
+    { at: 1, rgb: DANGER, alpha: 1, label: 'high' },
   ],
 }
 

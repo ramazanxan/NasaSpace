@@ -20,14 +20,14 @@ export function App() {
     <div className="app">
       <MarsViewer />
 
-      <aside className="panel panel--left" aria-label="Поиск и места">
+      <aside className="panel panel--left" aria-label="Search and places">
         <Brand />
         <SearchBox />
         <PlaceCard />
         <RegionList />
       </aside>
 
-      <aside className="panel panel--right" aria-label="Маршрут">
+      <aside className="panel panel--right" aria-label="Route">
         <RoutePanel />
       </aside>
 

@@ -11,7 +11,7 @@ export function TerrainControls() {
   return (
     <div className="float terrain-controls">
       <Mountain size={16} strokeWidth={1.5} aria-hidden className="muted" />
-      <Slider label="Рельеф" value={x} min={1} max={5} step={0.5} onChange={set} format={(v) => `${v}×`} />
+      <Slider label="Terrain" value={x} min={1} max={5} step={0.5} onChange={set} format={(v) => `${v}×`} />
     </div>
   )
 }

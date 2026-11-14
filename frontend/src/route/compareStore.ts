@@ -47,4 +47,4 @@ export const useCompare = create<CompareState>((set, get) => ({
     set((s) => ({ status: 'idle', error: null, results: {}, playing: null, runId: s.runId + 1, playId: s.playId + 1 })),
 }))
 
-export const ALGORITHM_LABEL: Record<Algorithm, string> = { astar: 'A*', dijkstra: 'Дейкстра' }
+export const ALGORITHM_LABEL: Record<Algorithm, string> = { astar: 'A*', dijkstra: 'Dijkstra' }

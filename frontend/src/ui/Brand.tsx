@@ -8,7 +8,7 @@ export function Brand() {
         <path d="M6 19c5-3 9 2 14-1s6-1 7 0" stroke="var(--c-accent)" strokeWidth="2.4" fill="none" strokeLinecap="round" />
       </svg>
       <span className="brand__name">NasaSpace</span>
-      {usingMocks && <span className="brand__mode" title="VITE_API_URL не задан: данные генерируются в браузере">Демо-данные</span>}
+      {usingMocks && <span className="brand__mode" title="VITE_API_URL is not set: data is generated in the browser">Demo data</span>}
     </header>
   )
 }

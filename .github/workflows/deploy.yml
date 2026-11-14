@@ -14,7 +14,7 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      # TODO: добавить шаги деплоя под выбранную платформу
-      # (Vercel / Netlify / GitHub Pages / сервер по SSH и т.д.).
-      # Ключи кладём в Settings → Secrets and variables → Actions.
-      - run: echo "Здесь будет деплой"
+      # TODO: add deploy steps for the chosen platform. The frontend deploys
+      # through Vercel's Git integration (Root Directory: frontend), so this job
+      # is only needed for other targets. Keys go in Settings → Secrets → Actions.
+      - run: echo "Deploy runs through Vercel"

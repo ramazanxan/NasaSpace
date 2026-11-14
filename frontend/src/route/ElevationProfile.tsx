@@ -33,8 +33,8 @@ function distanceAxis(total: number) {
   const ticks = ticksIn(0, total, step)
   const last = ticks.at(-1)
   const num = (m: number) =>
-    km ? (m / 1000).toLocaleString('ru-RU', { maximumFractionDigits: step < 1000 ? 1 : 0 }) : fmt.int(m)
-  return { ticks, tick: (m: number) => (m === last ? `${num(m)} ${km ? 'км' : 'м'}` : num(m)) }
+    km ? (m / 1000).toLocaleString('en-US', { maximumFractionDigits: step < 1000 ? 1 : 0 }) : fmt.int(m)
+  return { ticks, tick: (m: number) => (m === last ? `${num(m)} ${km ? 'km' : 'm'}` : num(m)) }
 }
 
 /** Height axis: three or four round levels with a little air above and below. */
@@ -54,8 +54,8 @@ function ProfileTooltip({ active, payload }: { active?: boolean; payload?: Reado
       <span>
         {fmt.km(p.d)} {fmt.kmUnit(p.d)}
       </span>
-      <span>{fmt.height(p.h)} м</span>
-      <span>уклон {fmt.deg(p.s)}°</span>
+      <span>{fmt.height(p.h)} m</span>
+      <span>slope {fmt.deg(p.s)}°</span>
     </div>
   )
 }
@@ -85,20 +85,20 @@ export function ElevationProfile({ points }: { points: RoutePoint[] }) {
   return (
     <figure className="route-profile">
       <figcaption className="route-profile__head">
-        <span className="section__title">Профиль высот</span>
+        <span className="section__title">Elevation profile</span>
         <span className="route-profile__range">
-          {fmt.height(lo)} … {fmt.height(hi)} м
+          {fmt.height(lo)} … {fmt.height(hi)} m
         </span>
       </figcaption>
       <div
         className="route-profile__chart"
         role="img"
-        aria-label={`Профиль высот: от ${fmt.height(lo)} до ${fmt.height(hi)} м на ${fmt.km(total)} ${fmt.kmUnit(total)}`}
+        aria-label={`Elevation profile: from ${fmt.height(lo)} to ${fmt.height(hi)} m over ${fmt.km(total)} ${fmt.kmUnit(total)}`}
       >
         <ResponsiveContainer width="100%" height={HEIGHT}>
           <AreaChart
             data={data}
-            margin={{ top: 8, right: 4, bottom: 0, left: 0 }}
+            margin={{ top: 8, right: 16, bottom: 0, left: 0 }}
             onMouseMove={(st) => {
               const i = st.activeTooltipIndex
               hover(st.isTooltipActive && i != null ? Number(i) : null)

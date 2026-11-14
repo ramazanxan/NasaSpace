@@ -1,29 +1,29 @@
 # NasaSpace backend (Java)
 
-Бэкенд планировщика маршрутов по Марсу. Контракт с фронтендом:
-[`docs/API.md`](../docs/API.md) (описание для людей) и [`docs/openapi.yaml`](../docs/openapi.yaml) (OpenAPI 3.1).
-Реализовать нужно ровно эти эндпоинты, без дополнительных полей.
+Backend of the Mars route planner. Contract with the frontend:
+[`docs/API.md`](../docs/API.md) (human-readable description) and [`docs/openapi.yaml`](../docs/openapi.yaml) (OpenAPI 3.1).
+Implement exactly these endpoints, without additional fields.
 
-## Рекомендуемый стек
+## Recommended stack
 
 - Java 21, Spring Boot 3 (spring-boot-starter-web, validation)
-- springdoc-openapi (`springdoc-openapi-starter-webmvc-ui`): Swagger UI на `/swagger-ui.html`,
-  OpenAPI JSON на `/v3/api-docs`. Фронт может сгенерировать из него типы через `openapi-typescript`.
-- Maven или Gradle, JUnit 5 для тестов.
-- Базы данных нет: всё держим в памяти.
+- springdoc-openapi (`springdoc-openapi-starter-webmvc-ui`): Swagger UI at `/swagger-ui.html`,
+  OpenAPI JSON at `/v3/api-docs`. The frontend can generate types from it via `openapi-typescript`.
+- Maven or Gradle, JUnit 5 for tests.
+- No database: everything is kept in memory.
 
-## Структура пакетов
+## Package structure
 
 ```
 com.nasaspace
-├── api/        REST-контроллеры, DTO (records), ApiErrorBody, @RestControllerAdvice, CORS
-├── terrain/    загрузка сеток высот в память, TerrainGrid, слои slope/hazard
-├── routing/    A*, Dijkstra, модель стоимости, режимы rover/astronaut, trails
-├── places/     список мест и поиск
-└── sun/        положение Солнца (sunState)
+├── api/        REST controllers, DTOs (records), ApiErrorBody, @RestControllerAdvice, CORS
+├── terrain/    loading height grids into memory, TerrainGrid, slope/hazard layers
+├── routing/    A*, Dijkstra, cost model, rover/astronaut modes, trails
+├── places/     place list and search
+└── sun/        Sun position (sunState)
 ```
 
-## DTO (records, поля один в один с контрактом)
+## DTOs (records, fields one-to-one with the contract)
 
 ```java
 public record LonLat(double lon, double lat) {}
@@ -31,20 +31,20 @@ public record LonLat(double lon, double lat) {}
 public record RoutePoint(
     double lon,
     double lat,
-    double height,    // м от ареоида MOLA
-    double distance,  // м от начала маршрута, у первой точки 0
-    double slope      // градусы
+    double height,    // m from the MOLA areoid
+    double distance,  // m from the route start, 0 for the first point
+    double slope      // degrees
 ) {}
 
 public record RouteStats(
-    double length,    // м
-    double ascent,    // м, суммарный набор
-    double descent,   // м, суммарный спуск (положительное число)
-    double maxSlope,  // градусы
-    double sols       // length / метры за сол режима, округление до 0.1
+    double length,    // m
+    double ascent,    // m, total ascent
+    double descent,   // m, total descent (a positive number)
+    double maxSlope,  // degrees
+    double sols       // length / meters per sol of the mode, rounded to 0.1
 ) {}
 
-public enum TravelMode { rover, astronaut } // в JSON строчными: "rover" / "astronaut"
+public enum TravelMode { rover, astronaut } // lowercase in JSON: "rover" / "astronaut"
 
 public record Route(
     String regionId,
@@ -55,26 +55,26 @@ public record Route(
 
 public record RouteRequest(String regionId, LonLat from, LonLat to, TravelMode mode) {}
 
-public record RouteDebug(String algorithm, List<double[]> visited, Route route) {} // route может быть null
+public record RouteDebug(String algorithm, List<double[]> visited, Route route) {} // route may be null
 
 public record ApiErrorBody(String code, String message) {}
 ```
 
-Имена JSON-полей camelCase, как в записях. `ApiErrorBody.code` это одно из:
+JSON field names are camelCase, as in the records. `ApiErrorBody.code` is one of:
 `OUT_OF_REGION`, `UNREACHABLE`, `BAD_REQUEST`, `NOT_FOUND`, `INTERNAL`.
-Значения `TravelMode` в JSON строчные (`rover`, `astronaut`), поэтому лучше назвать константы так же или
-использовать `@JsonValue`/`@JsonProperty`. Поле `RouteDebug.route` должно сериализоваться как `null`, а не пропускаться.
+`TravelMode` values are lowercase in JSON (`rover`, `astronaut`), so it is best to name the constants the same way or
+use `@JsonValue`/`@JsonProperty`. The `RouteDebug.route` field must serialize as `null`, not be omitted.
 
-Ошибки: бросайте своё `ApiException(status, code, message)` и превращайте в `ApiErrorBody` в одном
-`@RestControllerAdvice`. Так же ловите ошибки валидации, битый JSON и неизвестный путь (`BAD_REQUEST`/`NOT_FOUND`)
-и любое необработанное исключение (`INTERNAL`): фронт ждёт `{code, message}` на любом не-2xx.
+Errors: throw your own `ApiException(status, code, message)` and convert it to `ApiErrorBody` in a single
+`@RestControllerAdvice`. Also catch validation errors, malformed JSON and unknown paths (`BAD_REQUEST`/`NOT_FOUND`)
+and any unhandled exception (`INTERNAL`): the frontend expects `{code, message}` on every non-2xx response.
 
 ## CORS
 
-Разрешить: точный домен проекта на Vercel, превью-деплои только этого проекта по шаблону
-(например, `https://nasaspace-*-<team>.vercel.app`) и `http://localhost:5173`.
-**Не** разрешайте `*.vercel.app` целиком. Методы GET/POST/OPTIONS, заголовки Content-Type/Accept, `allowCredentials(false)`.
-Если появится авторизация, только точные origins. Значения вынесите в конфиг:
+Allow: the exact project domain on Vercel, preview deployments of this project only, by pattern
+(for example, `https://nasaspace-*-<team>.vercel.app`), and `http://localhost:5173`.
+Do **not** allow all of `*.vercel.app`. Methods GET/POST/OPTIONS, headers Content-Type/Accept, `allowCredentials(false)`.
+If authorization appears, use exact origins only. Move the values into configuration:
 
 ```java
 @Configuration
@@ -93,50 +93,50 @@ public class CorsConfig implements WebMvcConfigurer {
 }
 ```
 
-Фронт в продакшне должен ходить на бэкенд по `https://` (`VITE_API_URL`).
+In production the frontend must call the backend over `https://` (`VITE_API_URL`).
 
-## Сетки в памяти (без БД)
+## In-memory grids (no database)
 
-- При старте загрузите по одной сетке высот на район (5-6 штук) и держите в `Map<String, TerrainGrid>`.
-  Рекомендуемый размер 257 x 257, `double[]` или `float[]` в порядке row-major от северо-западного угла
-  (`i = row * width + col`), как в ответе API.
-- Уклон считайте один раз при загрузке (центральные разности, края фиксируются) и кэшируйте; слой `hazard` тоже.
-- Источник данных: файлы в ресурсах (например, GeoTIFF/PNG/бинарные `.bin` с данными MOLA/HiRISE, нарезанные под bbox района)
-  или временно синтетика. Все объекты неизменяемы после загрузки, значит потокобезопасны без блокировок.
-- Ответы `/terrain` и `/layers` около 66 тыс. чисел: включите gzip (`server.compression.enabled=true`,
+- At startup, load one height grid per region (5-6 of them) and keep them in a `Map<String, TerrainGrid>`.
+  Recommended size is 257 x 257, `double[]` or `float[]` in row-major order from the north-west corner
+  (`i = row * width + col`), as in the API response.
+- Compute slope once at load time (central differences, edges clamped) and cache it; the `hazard` layer too.
+- Data source: files in resources (for example, GeoTIFF/PNG/binary `.bin` files with MOLA/HiRISE data, cut to the region bbox)
+  or synthetic data for now. All objects are immutable after loading, so they are thread-safe without locks.
+- `/terrain` and `/layers` responses are about 66 thousand numbers: enable gzip (`server.compression.enabled=true`,
   `server.compression.mime-types=application/json`).
-- Места (`places`) и список районов держите как статический список в памяти; `height`/`slope` места берите
-  билинейной выборкой из сетки.
-- Расстояния считаются на сфере радиусом 3 389 500 м.
-- Координаты в ответах: долгота -180..180, восток положителен.
+- Keep places (`places`) and the region list as a static in-memory list; take a place's `height`/`slope`
+  from bilinear sampling of the grid.
+- Distances are computed on a sphere of radius 3,389,500 m.
+- Coordinates in responses: longitude -180..180, east is positive.
 
-## Эталонный алгоритм
+## Reference algorithm
 
-Эталонная реализация маршрутизации лежит во фронтенде: `frontend/src/api/mock/router.ts`
-(поиск по сетке с шагом 2 через узел, 8 соседей, модель стоимости, лимиты режимов
-rover 20 градусов / 150 м за сол и astronaut 30 градусов / 6000 м за сол, ошибки `OUT_OF_REGION` и `UNREACHABLE`).
-Там же формат `visited` для `/route/debug`. Остальные ориентиры:
+The reference routing implementation lives in the frontend: `frontend/src/api/mock/router.ts`
+(grid search with a step of 2 through a node, 8 neighbors, cost model, mode limits
+rover 20 degrees / 150 m per sol and astronaut 30 degrees / 6000 m per sol, `OUT_OF_REGION` and `UNREACHABLE` errors).
+It also defines the `visited` format for `/route/debug`. Other reference points:
 
-- `frontend/src/api/mock/terrain.ts`: раскладка сетки и расчёт уклона;
-- `frontend/src/api/mock/index.ts`: поиск мест, `/trails`, математика `/sun`;
-- `frontend/src/map/geo.ts`: `toGrid`/`fromGrid`, расстояние на сфере, билинейная выборка.
+- `frontend/src/api/mock/terrain.ts`: grid layout and slope computation;
+- `frontend/src/api/mock/index.ts`: place search, `/trails`, `/sun` math;
+- `frontend/src/map/geo.ts`: `toGrid`/`fromGrid`, distance on a sphere, bilinear sampling.
 
-Алгоритм можно улучшить, но контракт ответа (поля, единицы, ошибки) менять нельзя без правки
-`frontend/src/api/types.ts` и `docs/openapi.yaml` одновременно.
+You may improve the algorithm, but the response contract (fields, units, errors) must not change without editing
+`frontend/src/api/types.ts` and `docs/openapi.yaml` at the same time.
 
-## Безопасность и лимиты
+## Security and limits
 
-Подробный список: раздел 7 в [`docs/API.md`](../docs/API.md). Кратко:
+Detailed list: section 7 in [`docs/API.md`](../docs/API.md). In short:
 
-- Bean Validation на DTO (`@Valid`, `@DecimalMin/@DecimalMax`, `@Pattern("^[a-z0-9-]{1,32}$")` для `regionId`,
-  `@Size`/`@Min`/`@Max` для `q` и `limit`); границы как в `docs/openapi.yaml`.
-- `Semaphore` на параллельные поиски маршрута, таймаут одного поиска, кэш по `(region, округлённые from/to, mode)`.
-- Rate limit по IP (например, Bucket4j): около 10 запросов/с на `/route`, 1 запрос/с на `/route/debug`; ответ 429.
-- Отклонять POST с телом больше 4 КБ (`server.tomcat.max-swallow-size`, фильтр по `Content-Length`).
-- `server.error.include-stacktrace=never`; не возвращать сырой ввод в `message`.
-- Swagger UI и `/v3/api-docs` в продакшне отключить или оставить сознательно для демо; actuator не открывать без ограничений.
-- Access-логи без тел запросов.
+- Bean Validation on DTOs (`@Valid`, `@DecimalMin/@DecimalMax`, `@Pattern("^[a-z0-9-]{1,32}$")` for `regionId`,
+  `@Size`/`@Min`/`@Max` for `q` and `limit`); bounds as in `docs/openapi.yaml`.
+- A `Semaphore` on concurrent route searches, a timeout for a single search, a cache by `(region, rounded from/to, mode)`.
+- Per-IP rate limit (for example, Bucket4j): about 10 requests/s on `/route`, 1 request/s on `/route/debug`; respond 429.
+- Reject POSTs with a body larger than 4 KB (`server.tomcat.max-swallow-size`, a filter on `Content-Length`).
+- `server.error.include-stacktrace=never`; do not return raw input in `message`.
+- Disable Swagger UI and `/v3/api-docs` in production or leave them on deliberately for a demo; do not expose actuator without restrictions.
+- Access logs without request bodies.
 
-## Проверка совместимости
+## Compatibility check
 
-Чек-лист в конце [`docs/API.md`](../docs/API.md), раздел "Чек-лист: как проверить, что бэкенд совместим".
+The checklist is at the end of [`docs/API.md`](../docs/API.md), section "Checklist: verifying backend compatibility".

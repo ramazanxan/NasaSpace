@@ -73,7 +73,7 @@ export function PlaceCard() {
             {place.name}
           </h2>
         </div>
-        <IconButton label="Закрыть карточку" onClick={() => selectPlace(null)}>
+        <IconButton label="Close card" onClick={() => selectPlace(null)}>
           <X size={16} strokeWidth={1.5} />
         </IconButton>
       </header>
@@ -81,8 +81,8 @@ export function PlaceCard() {
       <p className="place__coord">{formatCoord(place.position)}</p>
 
       <div className="place__stats">
-        <Stat label="Высота" value={fmt.height(place.height)} unit="м" />
-        <Stat label="Уклон" value={`${fmt.deg(place.slope)}°`} />
+        <Stat label="Elevation" value={fmt.height(place.height)} unit="m" />
+        <Stat label="Slope" value={`${fmt.deg(place.slope)}°`} />
       </div>
 
       {place.description && <p className="place__desc">{place.description}</p>}
@@ -94,7 +94,7 @@ export function PlaceCard() {
           className="place__action"
           onClick={() => setPoint('from', place.position)}
         >
-          Отсюда
+          From here
         </Button>
         <Button
           icon={<MapPin size={16} strokeWidth={1.5} />}
@@ -102,7 +102,7 @@ export function PlaceCard() {
           className="place__action"
           onClick={() => setPoint('to', place.position)}
         >
-          Сюда
+          To here
         </Button>
       </div>
     </article>

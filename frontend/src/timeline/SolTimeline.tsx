@@ -24,7 +24,7 @@ function clock(h: number): string {
 /** Typographic minus for negative elevations. */
 const signedDeg = (v: number) => (v < 0 ? `−${fmt.deg(-v)}` : fmt.deg(v))
 
-const hours = (v: number) => v.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const hours = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 /** Debounced sun position for a point and moment. Keeps the last answer while a new one loads. */
 function useSun(point: LonLat, sol: number, hour: number): SunState | null {
@@ -59,11 +59,11 @@ export function SolTimeline() {
   useSunLighting(center, sun)
 
   return (
-    <section className="float sol-timeline" aria-label="Время на Марсе">
+    <section className="float sol-timeline" aria-label="Time on Mars">
       <div className="sol-timeline__sliders">
-        <Slider label="Сол" value={sol} min={0} max={SOLS_PER_YEAR} onChange={(v) => setTime({ sol: v })} format={fmt.int} />
+        <Slider label="Sol" value={sol} min={0} max={SOLS_PER_YEAR} onChange={(v) => setTime({ sol: v })} format={fmt.int} />
         <Slider
-          label="Местное время"
+          label="Local time"
           value={hour}
           min={0}
           max={24}
@@ -81,14 +81,14 @@ export function SolTimeline() {
                 {clock(sun.lmst)} <span className="muted">LMST</span>
               </span>
               <span className="sol-timeline__line">
-                Высота {signedDeg(sun.elevation)}°, азимут {fmt.int(sun.azimuth)}°
+                Elevation {signedDeg(sun.elevation)}°, azimuth {fmt.int(sun.azimuth)}°
               </span>
               <span className="sol-timeline__line">
-                {sun.hoursToSunset === null ? 'Солнце за горизонтом' : `До заката ${hours(sun.hoursToSunset)} ч`}
+                {sun.hoursToSunset === null ? 'Sun below the horizon' : `Sunset in ${hours(sun.hoursToSunset)} h`}
               </span>
             </>
           ) : (
-            <span className="sol-timeline__line">Считаем положение Солнца</span>
+            <span className="sol-timeline__line">Calculating the Sun position</span>
           )}
         </div>
       </div>

@@ -53,7 +53,7 @@ class MinHeap {
 
 export function searchRoute(t: TerrainGrid, req: RouteRequest, algorithm: 'astar' | 'dijkstra' = 'astar'): RouteDebug {
   if (!inBBox(req.from, t.bbox) || !inBBox(req.to, t.bbox)) {
-    throw new MockApiError(422, 'OUT_OF_REGION', 'Точка вне зоны: выберите место внутри района')
+    throw new MockApiError(422, 'OUT_OF_REGION', 'Point is outside the region: pick a spot inside it')
   }
   const { maxSlope, metresPerSol } = MODE_LIMITS[req.mode]
   const slopes = slopeGrid(t)
@@ -75,10 +75,10 @@ export function searchRoute(t: TerrainGrid, req: RouteRequest, algorithm: 'astar
   const start = node(req.from)
   const goal = node(req.to)
   if (start === goal) {
-    throw new MockApiError(400, 'BAD_REQUEST', 'Точки А и Б слишком близко: отодвиньте одну из них')
+    throw new MockApiError(400, 'BAD_REQUEST', 'Points A and B are too close: move one of them')
   }
   if (s(start) > maxSlope || s(goal) > maxSlope) {
-    throw new MockApiError(422, 'UNREACHABLE', `Точка слишком крутая: больше ${maxSlope}° для этого режима`)
+    throw new MockApiError(422, 'UNREACHABLE', `Point is too steep: over ${maxSlope}° for this mode`)
   }
 
   const gx = goal % W

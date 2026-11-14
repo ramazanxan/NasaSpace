@@ -11,10 +11,10 @@ const ALGORITHMS: Algorithm[] = ['astar', 'dijkstra']
 
 function compareNote(astar: number, dijkstra: number, la?: number | null, ld?: number | null): string {
   const ratio = dijkstra / astar
-  const cells = ratio >= 1.05 ? `A* просмотрел в ${fmt.deg(ratio)} раза меньше клеток` : 'Оба просмотрели почти столько же клеток'
+  const cells = ratio >= 1.05 ? `A* scanned ${fmt.deg(ratio)}× fewer cells` : 'Both scanned about the same number of cells'
   if (la == null || ld == null) return cells
   const same = Math.abs(la - ld) <= Math.max(1, ld * 0.01)
-  return same ? `${cells}, путь той же длины` : `${cells}. Длина пути: ${fmt.km(la)} ${fmt.kmUnit(la)} и ${fmt.km(ld)} ${fmt.kmUnit(ld)}`
+  return same ? `${cells}, same path length` : `${cells}. Path length: ${fmt.km(la)} ${fmt.kmUnit(la)} and ${fmt.km(ld)} ${fmt.kmUnit(ld)}`
 }
 
 /** A* vs Dijkstra: how many grid cells each one expands to find the same route. */
@@ -54,7 +54,7 @@ export function RouteCompare({ req }: { req: RouteRequest }) {
         onClick={run}
         disabled={status === 'loading'}
       >
-        {status === 'loading' ? 'Считаем оба алгоритма…' : 'Сравнить A* и Дейкстру'}
+        {status === 'loading' ? 'Running both algorithms…' : 'Compare A* and Dijkstra'}
       </Button>
     )
   }
@@ -64,7 +64,7 @@ export function RouteCompare({ req }: { req: RouteRequest }) {
       <div className="route-compare">
         <Notice tone="error">{error}</Notice>
         <Button variant="ghost" onClick={run} icon={<RotateCcw size={16} strokeWidth={1.5} aria-hidden />}>
-          Повторить
+          Retry
         </Button>
       </div>
     )
@@ -73,10 +73,10 @@ export function RouteCompare({ req }: { req: RouteRequest }) {
   const astar = results.astar?.visited.length ?? 0
   const dijkstra = results.dijkstra?.visited.length ?? 0
   return (
-    <section className="route-compare" aria-label="Сравнение алгоритмов">
+    <section className="route-compare" aria-label="Algorithm comparison">
       <div className="route-compare__head">
-        <span className="section__title">Просмотрено клеток сетки</span>
-        <IconButton label="Скрыть сравнение" onClick={reset}>
+        <span className="section__title">Grid cells scanned</span>
+        <IconButton label="Hide comparison" onClick={reset}>
           <X size={16} strokeWidth={1.5} aria-hidden />
         </IconButton>
       </div>
@@ -92,7 +92,7 @@ export function RouteCompare({ req }: { req: RouteRequest }) {
               </span>
               <span className="route-compare__count">{fmt.int(n)}</span>
               <IconButton
-                label={`Показать поиск: ${ALGORITHM_LABEL[alg]}`}
+                label={`Show search: ${ALGORITHM_LABEL[alg]}`}
                 aria-pressed={playing === alg}
                 onClick={() => play(alg)}
               >

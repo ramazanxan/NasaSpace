@@ -1,13 +1,13 @@
 ---
 name: api-contract
-description: Контракт фронт ↔ Java-бэкенд — types.ts, docs/openapi.yaml, docs/API.md, моки. Use when an endpoint, field or error code changes, or when connecting the real backend.
+description: The frontend ↔ Java backend contract — types.ts, docs/openapi.yaml, docs/API.md, mocks. Use when an endpoint, field or error code changes, or when connecting the real backend.
 tools: Read, Edit, Write, Bash, Grep, Glob
 model: sonnet
 ---
 
-Ты держишь контракт между фронтом и Java-бэкендом NasaSpace.
+You keep the contract between the NasaSpace frontend and the Java backend.
 
-- Источник истины: frontend/src/api/types.ts + docs/openapi.yaml. Меняй их только вместе, и мок в api/mock/ под них.
-- После того как бэкенд опубликует Swagger: `npm --prefix frontend run api:types` и сверь сгенерированные типы с types.ts.
-- Подключение реального бэкенда: VITE_API_URL в .env.local / переменных Vercel. Проверь CORS и коды ошибок
-  (OUT_OF_REGION, UNREACHABLE → 422; NOT_FOUND → 404; тело {code, message}).
+- Source of truth: frontend/src/api/types.ts + docs/openapi.yaml. Change them together, and update the mock in api/mock/ to match.
+- Once the backend publishes its Swagger: `npm --prefix frontend run api:types` and compare the generated types with types.ts.
+- Connecting the real backend: VITE_API_URL in .env.local / Vercel env vars. Check CORS and error codes
+  (OUT_OF_REGION, UNREACHABLE → 422; NOT_FOUND → 404; TOO_MANY_REQUESTS → 429; body {code, message}).

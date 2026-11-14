@@ -12,8 +12,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Список смоделированных районов
-         * @description Все районы (5-6 штук), для которых есть рельеф. Остальной Марс на фронте только подложка.
+         * List of modeled regions
+         * @description All regions (5-6 of them) that have terrain. The rest of Mars is only a backdrop on the frontend.
          */
         get: operations["getRegions"];
         put?: never;
@@ -32,11 +32,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Сетка высот района
-         * @description Регулярная сетка высот, покрывающая bbox района. Row-major, от северо-западного угла.
-         *     Моки отдают 257 x 257 (66 049 значений); бэкенд может отдавать другой размер,
-         *     фронт читает width и height из ответа. Ответ большой, рекомендуется gzip.
-         *     В примере массив heights сокращён.
+         * Region height grid
+         * @description Regular height grid covering the region bbox. Row-major, from the north-west corner.
+         *     The mocks serve 257 x 257 (66,049 values); the backend may serve a different size,
+         *     the frontend reads width and height from the response. The response is large, gzip is recommended.
+         *     The heights array is abbreviated in the example.
          */
         get: operations["getTerrain"];
         put?: never;
@@ -55,9 +55,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Слой уклона или опасности
-         * @description Та же раскладка сетки, что у TerrainGrid (тот же bbox, width, height).
-         *     slope в градусах, hazard в диапазоне 0..1. В примере массив values сокращён.
+         * Slope or hazard layer
+         * @description Same grid layout as TerrainGrid (same bbox, width, height).
+         *     slope is in degrees, hazard is in the range 0..1. The values array is abbreviated in the example.
          */
         get: operations["getLayer"];
         put?: never;
@@ -76,10 +76,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Поиск мест по названию
-         * @description Регистронезависимый поиск подстроки по name и description.
-         *     Пустой q возвращает первые limit мест. Фронт всегда передаёт limit=8.
-         *     Если ничего не найдено: пустой массив и 200, не 404.
+         * Search places by name
+         * @description Case-insensitive substring search over name and description.
+         *     An empty q returns the first limit places. The frontend always sends limit=8.
+         *     If nothing is found: an empty array and 200, not 404.
          */
         get: operations["searchPlaces"];
         put?: never;
@@ -100,14 +100,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Построить маршрут
-         * @description Строит маршрут между двумя точками внутри района. Режимы и лимиты (эталон: mock/router.ts):
-         *     rover до 20 градусов уклона и 150 м за сол; astronaut до 30 градусов и 6000 м за сол.
-         *     stats.sols = length / метры за сол, округление до 0.1.
-         *     Первая и последняя точки маршрута совпадают с from и to из запроса.
-         *     Если A и B попадают в один узел сетки, ответ 400 BAD_REQUEST
-         *     «Точки А и Б слишком близко: отодвиньте одну из них».
-         *     Лимит запросов: около 10 в секунду на IP, иначе 429.
+         * Build a route
+         * @description Builds a route between two points inside a region. Modes and limits (reference: mock/router.ts):
+         *     rover up to 20 degrees of slope and 150 m per sol; astronaut up to 30 degrees and 6000 m per sol.
+         *     stats.sols = length / meters per sol, rounded to 0.1.
+         *     The first and last route points match from and to from the request.
+         *     If A and B fall into the same grid node, the response is 400 BAD_REQUEST
+         *     "Points A and B are too close: move one of them".
+         *     Rate limit: about 10 per second per IP, otherwise 429.
          */
         post: operations["buildRoute"];
         delete?: never;
@@ -126,12 +126,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Маршрут с внутренностями поиска (A* против Dijkstra)
-         * @description Тот же запрос, что /route, плюс порядок раскрытия клеток для визуального сравнения алгоритмов.
-         *     Отличие от /route: если путь не найден, ответ 200 с route: null
-         *     (а не 422 UNREACHABLE). Ошибки OUT_OF_REGION и UNREACHABLE для слишком крутой
-         *     начальной или конечной точки возвращаются как 422, как и в /route; совпадение узлов A и B даёт 400.
-         *     Лимит запросов: около 1 в секунду на IP, иначе 429.
+         * Route with search internals (A* vs Dijkstra)
+         * @description The same request as /route, plus the cell expansion order for a visual comparison of the algorithms.
+         *     Difference from /route: if no path is found, the response is 200 with route: null
+         *     (not 422 UNREACHABLE). The OUT_OF_REGION and UNREACHABLE errors for a start or end
+         *     point that is too steep are returned as 422, as in /route; coinciding A and B nodes give 400.
+         *     Rate limit: about 1 per second per IP, otherwise 429.
          */
         post: operations["buildRouteDebug"];
         delete?: never;
@@ -148,10 +148,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Тропы района (рёбра дорожного графа)
-         * @description Полилинии существующих троп района. В моках это три маршрута режима astronaut
-         *     между фиксированными точками района; бэкенд волен отдавать свой граф.
-         *     Если троп нет, возвращается пустой массив.
+         * Region trails (road graph edges)
+         * @description Polylines of the existing trails in the region. In the mocks these are three astronaut-mode routes
+         *     between fixed points of the region; the backend is free to serve its own graph.
+         *     If there are no trails, an empty array is returned.
          */
         get: operations["getTrails"];
         put?: never;
@@ -170,9 +170,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Положение Солнца в точке
-         * @description Положение Солнца для точки, сола и местного среднего солнечного времени (LMST).
-         *     Эталонная математика: sunState в frontend/src/api/mock/index.ts.
+         * Sun position at a point
+         * @description Sun position for a point, a sol and local mean solar time (LMST).
+         *     Reference math: sunState in frontend/src/api/mock/index.ts.
          */
         get: operations["getSun"];
         put?: never;
@@ -187,49 +187,49 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description Точка в планетоцентрических градусах. */
+        /** @description A point in planetocentric degrees. */
         LonLat: {
-            /** @description Долгота, градусы, восток положителен, [-180, 180]. */
+            /** @description Longitude, degrees, east is positive, [-180, 180]. */
             lon: number;
-            /** @description Широта, градусы, [-90, 90]. */
+            /** @description Latitude, degrees, [-90, 90]. */
             lat: number;
         };
-        /** @description Границы [west, south, east, north] в градусах. */
+        /** @description Bounds [west, south, east, north] in degrees. */
         BBox: number[];
-        /** @description Один из смоделированных районов. */
+        /** @description One of the modeled regions. */
         Region: {
             id: string;
             name: string;
-            /** @description Одна строка описания для списка районов. */
+            /** @description One-line description for the region list. */
             summary: string;
             bbox: components["schemas"]["BBox"];
             center: components["schemas"]["LonLat"];
-            /** @description Типичная высота дна района, метры от ареоида MOLA. */
+            /** @description Typical height of the region floor, meters from the MOLA areoid. */
             baseHeight: number;
         };
-        /** @description Регулярная сетка высот, row-major от северо-западного угла. */
+        /** @description Regular height grid, row-major from the north-west corner. */
         TerrainGrid: {
             regionId: string;
             bbox: components["schemas"]["BBox"];
-            /** @description Число столбцов (вдоль долготы, с запада на восток). */
+            /** @description Number of columns (along longitude, west to east). */
             width: number;
-            /** @description Число строк (вдоль широты, с севера на юг). */
+            /** @description Number of rows (along latitude, north to south). */
             height: number;
-            /** @description Высоты, метры от ареоида MOLA. Длина равна width * height, индекс = row * width + col. */
+            /** @description Heights, meters from the MOLA areoid. Length equals width * height, index = row * width + col. */
             heights: number[];
-            /** @description Расстояние по земле между соседними отсчётами, метры. */
+            /** @description Ground distance between adjacent samples, meters. */
             resolution: number;
         };
         /** @enum {string} */
         LayerKind: "slope" | "hazard";
-        /** @description Сетка слоя, раскладка как у TerrainGrid. */
+        /** @description Layer grid, same layout as TerrainGrid. */
         LayerGrid: {
             regionId: string;
             kind: components["schemas"]["LayerKind"];
             bbox: components["schemas"]["BBox"];
             width: number;
             height: number;
-            /** @description Для slope градусы, для hazard 0..1. Длина равна width * height. */
+            /** @description For slope degrees, for hazard 0..1. Length equals width * height. */
             values: number[];
         };
         /** @enum {string} */
@@ -240,14 +240,14 @@ export interface components {
             kind: components["schemas"]["PlaceKind"];
             regionId: string;
             position: components["schemas"]["LonLat"];
-            /** @description Высота в точке, метры от ареоида MOLA. */
+            /** @description Height at the point, meters from the MOLA areoid. */
             height: number;
-            /** @description Уклон в точке, градусы. */
+            /** @description Slope at the point, degrees. */
             slope: number;
             description: string;
         };
         /**
-         * @description rover: до 20 градусов, 150 м за сол. astronaut: до 30 градусов, 6000 м за сол.
+         * @description rover: up to 20 degrees, 150 m per sol. astronaut: up to 30 degrees, 6000 m per sol.
          * @enum {string}
          */
         TravelMode: "rover" | "astronaut";
@@ -257,25 +257,25 @@ export interface components {
             to: components["schemas"]["LonLat"];
             mode: components["schemas"]["TravelMode"];
         };
-        /** @description Точка маршрута (LonLat плюс высота, дистанция и уклон). */
+        /** @description Route point (LonLat plus height, distance and slope). */
         RoutePoint: components["schemas"]["LonLat"] & {
-            /** @description Высота, метры от ареоида MOLA. */
+            /** @description Height, meters from the MOLA areoid. */
             height: number;
-            /** @description Расстояние от начала маршрута вдоль него, метры. У первой точки 0. */
+            /** @description Distance from the route start along it, meters. 0 for the first point. */
             distance: number;
-            /** @description Уклон в точке, градусы. */
+            /** @description Slope at the point, degrees. */
             slope: number;
         };
         RouteStats: {
-            /** @description Длина маршрута, метры. */
+            /** @description Route length, meters. */
             length: number;
-            /** @description Суммарный набор высоты, метры. */
+            /** @description Total ascent, meters. */
             ascent: number;
-            /** @description Суммарный спуск, метры (положительное число). */
+            /** @description Total descent, meters (a positive number). */
             descent: number;
-            /** @description Максимальный уклон вдоль маршрута, градусы. */
+            /** @description Maximum slope along the route, degrees. */
             maxSlope: number;
-            /** @description Длительность в солах (length / метры за сол режима). */
+            /** @description Duration in sols (length / meters per sol of the mode). */
             sols: number;
         };
         Route: {
@@ -287,9 +287,9 @@ export interface components {
         RouteDebug: {
             /** @enum {string} */
             algorithm: "astar" | "dijkstra";
-            /** @description Клетки сетки в порядке раскрытия, пары [lon, lat]. */
+            /** @description Grid cells in expansion order, [lon, lat] pairs. */
             visited: number[][];
-            /** @description Маршрут или null, если путь не найден. */
+            /** @description Route, or null if no path is found. */
             route: components["schemas"]["Route"] | null;
         };
         Trail: {
@@ -300,26 +300,26 @@ export interface components {
         };
         SunState: {
             sol: number;
-            /** @description Местное среднее солнечное время, часы 0..24. */
+            /** @description Local mean solar time, hours 0..24. */
             lmst: number;
-            /** @description Градусы над горизонтом, отрицательное ночью. */
+            /** @description Degrees above the horizon, negative at night. */
             elevation: number;
-            /** @description Градусы по часовой стрелке от севера. */
+            /** @description Degrees clockwise from north. */
             azimuth: number;
-            /** @description Часов до заката, null когда Солнце под горизонтом. */
+            /** @description Hours until sunset, null when the Sun is below the horizon. */
             hoursToSunset: number | null;
         };
         /** @enum {string} */
-        ApiErrorCode: "OUT_OF_REGION" | "UNREACHABLE" | "BAD_REQUEST" | "NOT_FOUND" | "INTERNAL";
-        /** @description Тело любого ответа не 2xx. */
+        ApiErrorCode: "OUT_OF_REGION" | "UNREACHABLE" | "BAD_REQUEST" | "NOT_FOUND" | "INTERNAL" | "TOO_MANY_REQUESTS";
+        /** @description Body of any non-2xx response. */
         ApiErrorBody: {
             code: components["schemas"]["ApiErrorCode"];
-            /** @description Текст для пользователя, по-русски, с подсказкой что делать дальше. */
+            /** @description User-facing text, in English, with a hint about what to do next. */
             message: string;
         };
     };
     responses: {
-        /** @description Неверные параметры или тело запроса. */
+        /** @description Invalid request parameters or body. */
         BadRequest: {
             headers: {
                 [name: string]: unknown;
@@ -328,30 +328,30 @@ export interface components {
                 /**
                  * @example {
                  *       "code": "BAD_REQUEST",
-                 *       "message": "Неверный режим. Допустимо: rover или astronaut"
+                 *       "message": "Invalid mode. Allowed: rover or astronaut"
                  *     }
                  */
                 "application/json": components["schemas"]["ApiErrorBody"];
             };
         };
-        /** @description Превышен лимит запросов с одного IP. Фронт показывает message как есть. */
+        /** @description Request limit from a single IP exceeded. The frontend shows message as is. */
         TooManyRequests: {
             headers: {
-                /** @description Через сколько секунд повторить. */
+                /** @description How many seconds to wait before retrying. */
                 "Retry-After"?: number;
                 [name: string]: unknown;
             };
             content: {
                 /**
                  * @example {
-                 *       "code": "BAD_REQUEST",
-                 *       "message": "Слишком много запросов. Подождите секунду и повторите"
+                 *       "code": "TOO_MANY_REQUESTS",
+                 *       "message": "Too many requests. Wait a second and try again"
                  *     }
                  */
                 "application/json": components["schemas"]["ApiErrorBody"];
             };
         };
-        /** @description Район (или другой ресурс) не найден. */
+        /** @description Region (or other resource) not found. */
         NotFound: {
             headers: {
                 [name: string]: unknown;
@@ -360,16 +360,16 @@ export interface components {
                 /**
                  * @example {
                  *       "code": "NOT_FOUND",
-                 *       "message": "Район atlantis не найден"
+                 *       "message": "Region atlantis not found"
                  *     }
                  */
                 "application/json": components["schemas"]["ApiErrorBody"];
             };
         };
         /**
-         * @description Запрос корректен, но маршрут построить нельзя.
-         *     OUT_OF_REGION: точка вне bbox района. UNREACHABLE: начальная или конечная точка
-         *     круче лимита режима, либо путь перекрыт слишком крутыми склонами.
+         * @description The request is valid, but the route cannot be built.
+         *     OUT_OF_REGION: a point is outside the region bbox. UNREACHABLE: the start or end point
+         *     is steeper than the mode limit, or steep slopes block every path.
          */
         RouteUnprocessable: {
             headers: {
@@ -379,7 +379,7 @@ export interface components {
                 "application/json": components["schemas"]["ApiErrorBody"];
             };
         };
-        /** @description Внутренняя ошибка сервера. */
+        /** @description Internal server error. */
         Internal: {
             headers: {
                 [name: string]: unknown;
@@ -388,7 +388,7 @@ export interface components {
                 /**
                  * @example {
                  *       "code": "INTERNAL",
-                 *       "message": "Внутренняя ошибка сервера. Попробуйте ещё раз"
+                 *       "message": "Internal server error. Try again"
                  *     }
                  */
                 "application/json": components["schemas"]["ApiErrorBody"];
@@ -397,7 +397,7 @@ export interface components {
     };
     parameters: {
         /**
-         * @description Идентификатор района из GET /regions (jezero, gale, olympus, melas, utopia, elysium).
+         * @description Region identifier from GET /regions (jezero, gale, olympus, melas, utopia, elysium).
          * @example jezero
          */
         RegionId: string;
@@ -417,7 +417,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Список районов */
+            /** @description List of regions */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -427,8 +427,8 @@ export interface operations {
                      * @example [
                      *       {
                      *         "id": "jezero",
-                     *         "name": "Кратер Езеро",
-                     *         "summary": "Древнее озеро с дельтой реки, место посадки Perseverance",
+                     *         "name": "Jezero Crater",
+                     *         "summary": "Ancient lake with a river delta, the Perseverance landing site",
                      *         "bbox": [
                      *           76.9,
                      *           17.9,
@@ -443,8 +443,8 @@ export interface operations {
                      *       },
                      *       {
                      *         "id": "gale",
-                     *         "name": "Кратер Гейл",
-                     *         "summary": "Кратер с горой Шарп в центре, где работает Curiosity",
+                     *         "name": "Gale Crater",
+                     *         "summary": "Crater with Mount Sharp at its center, where Curiosity operates",
                      *         "bbox": [
                      *           136.9,
                      *           -5.9,
@@ -472,7 +472,7 @@ export interface operations {
             header?: never;
             path: {
                 /**
-                 * @description Идентификатор района из GET /regions (jezero, gale, olympus, melas, utopia, elysium).
+                 * @description Region identifier from GET /regions (jezero, gale, olympus, melas, utopia, elysium).
                  * @example jezero
                  */
                 regionId: components["parameters"]["RegionId"];
@@ -481,7 +481,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Сетка высот */
+            /** @description Height grid */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -521,7 +521,7 @@ export interface operations {
             header?: never;
             path: {
                 /**
-                 * @description Идентификатор района из GET /regions (jezero, gale, olympus, melas, utopia, elysium).
+                 * @description Region identifier from GET /regions (jezero, gale, olympus, melas, utopia, elysium).
                  * @example jezero
                  */
                 regionId: components["parameters"]["RegionId"];
@@ -531,7 +531,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Сетка значений слоя */
+            /** @description Layer value grid */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -570,11 +570,11 @@ export interface operations {
         parameters: {
             query: {
                 /**
-                 * @description Поисковая строка, может быть пустой.
+                 * @description Search string, may be empty.
                  * @example Perseverance
                  */
                 q: string;
-                /** @description Максимум результатов. */
+                /** @description Maximum number of results. */
                 limit?: number;
             };
             header?: never;
@@ -583,7 +583,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Найденные места */
+            /** @description Matching places */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -593,7 +593,7 @@ export interface operations {
                      * @example [
                      *       {
                      *         "id": "octavia-butler",
-                     *         "name": "Посадка Perseverance",
+                     *         "name": "Perseverance landing site",
                      *         "kind": "landing-site",
                      *         "regionId": "jezero",
                      *         "position": {
@@ -602,7 +602,7 @@ export interface operations {
                      *         },
                      *         "height": -2613,
                      *         "slope": 1.8,
-                     *         "description": "Площадка «Октавия Батлер», где Perseverance сел 18 февраля 2021 года."
+                     *         "description": "The Octavia E. Butler landing site, where Perseverance landed on February 18, 2021."
                      *       }
                      *     ]
                      */
@@ -641,7 +641,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Маршрут */
+            /** @description Route */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -722,7 +722,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Маршрут и посещённые клетки */
+            /** @description Route and visited cells */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -770,7 +770,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Тропы */
+            /** @description Trails */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -781,7 +781,7 @@ export interface operations {
                      *       {
                      *         "id": "jezero-t0",
                      *         "regionId": "jezero",
-                     *         "name": "Тропа 1",
+                     *         "name": "Trail 1",
                      *         "points": [
                      *           {
                      *             "lon": 77.08,
@@ -811,22 +811,22 @@ export interface operations {
         parameters: {
             query: {
                 /**
-                 * @description Долгота, градусы, восток положителен.
+                 * @description Longitude, degrees, east is positive.
                  * @example 77.45
                  */
                 lon: number;
                 /**
-                 * @description Широта, градусы.
+                 * @description Latitude, degrees.
                  * @example 18.44
                  */
                 lat: number;
                 /**
-                 * @description Номер сола (число; фронт передаёт его как есть).
+                 * @description Sol number (a number; the frontend passes it as is).
                  * @example 120
                  */
                 sol: number;
                 /**
-                 * @description Местное среднее солнечное время, часы 0..24. Возвращается как lmst.
+                 * @description Local mean solar time, hours 0..24. Returned as lmst.
                  * @example 14.5
                  */
                 hour: number;
@@ -837,7 +837,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Состояние Солнца */
+            /** @description Sun state */
             200: {
                 headers: {
                     [name: string]: unknown;

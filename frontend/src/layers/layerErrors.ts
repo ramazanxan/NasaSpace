@@ -21,7 +21,7 @@ export const useLayerErrors = create<LayerErrors>((set) => ({
 }))
 
 export const LAYER_ERROR_TEXT: Record<LayerErrorKey, string> = {
-  slope: 'Не удалось загрузить слой уклона. Повторите позже',
-  hazard: 'Не удалось загрузить слой опасности. Повторите позже',
-  trails: 'Не удалось загрузить тропы. Повторите позже',
+  slope: 'Could not load the slope layer. Try again later',
+  hazard: 'Could not load the hazard layer. Try again later',
+  trails: 'Could not load trails. Try again later',
 }

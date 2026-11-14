@@ -62,7 +62,7 @@ export function sample(g: Grid, values: ArrayLike<number>, p: LonLat): number {
 }
 
 export function formatCoord({ lon, lat }: LonLat): string {
-  const ns = lat >= 0 ? 'с. ш.' : 'ю. ш.'
-  const ew = lon >= 0 ? 'в. д.' : 'з. д.'
+  const ns = lat >= 0 ? 'N' : 'S'
+  const ew = lon >= 0 ? 'E' : 'W'
   return `${Math.abs(lat).toFixed(3)}° ${ns}, ${Math.abs(lon).toFixed(3)}° ${ew}`
 }

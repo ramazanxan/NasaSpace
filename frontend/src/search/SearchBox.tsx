@@ -65,7 +65,7 @@ export function SearchBox() {
             setItems([])
             setResultsFor(text)
             setStatus('error')
-            setError(e instanceof ApiError ? e.message : 'Поиск не сработал. Попробуйте ещё раз')
+            setError(e instanceof ApiError ? e.message : 'Search failed. Try again')
           },
         )
       },
@@ -154,12 +154,12 @@ export function SearchBox() {
           className="search__input"
           type="text"
           role="combobox"
-          aria-label="Поиск мест"
+          aria-label="Search places"
           aria-autocomplete="list"
           aria-expanded={showList}
           aria-controls={listId}
           aria-activedescendant={showList && active >= 0 ? optionId(active) : undefined}
-          placeholder="Кратер, гора, место посадки"
+          placeholder="Crater, mountain, landing site"
           autoComplete="off"
           spellCheck={false}
           value={query}
@@ -181,8 +181,8 @@ export function SearchBox() {
           <button
             type="button"
             className="search__clear"
-            aria-label="Очистить"
-            title="Очистить"
+            aria-label="Clear"
+            title="Clear"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               setQuery('')
@@ -200,7 +200,7 @@ export function SearchBox() {
           id={listId}
           className="search__list"
           role="listbox"
-          aria-label="Места"
+          aria-label="Places"
           aria-busy={status === 'loading'}
         >
           {items.map((p, i) => (
@@ -221,21 +221,21 @@ export function SearchBox() {
               </span>
               <span className="search__height">
                 {fmt.height(p.height)}
-                <span className="search__unit"> м</span>
+                <span className="search__unit"> m</span>
               </span>
             </li>
           ))}
         </ul>
-        {empty && <p className="search__note">Ничего не нашлось. Попробуйте «Гейл» или «дельта»</p>}
+        {empty && <p className="search__note">Nothing found. Try “Gale” or “delta”</p>}
         {status === 'error' && error && (
           <p className="search__note search__note--error" role="alert">
             {error}
           </p>
         )}
-        {searching && <p className="search__note">Ищем…</p>}
+        {searching && <p className="search__note">Searching…</p>}
       </div>
       <span className="sr-only" aria-live="polite">
-        {status === 'ready' && open ? (items.length ? `Найдено: ${items.length}` : 'Ничего не нашлось') : ''}
+        {status === 'ready' && open ? (items.length ? `${items.length} found` : 'Nothing found') : ''}
       </span>
     </div>
   )

@@ -201,6 +201,6 @@ export function MarsViewer() {
     viewer.scene.requestRender()
   }, [exaggeration])
 
-  return <div ref={host} className="mars-viewer" aria-label="3D-карта Марса" role="application" />
+  return <div ref={host} className="mars-viewer" aria-label="3D map of Mars" role="application" />
 }
 

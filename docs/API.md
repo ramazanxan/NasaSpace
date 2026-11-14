@@ -1,59 +1,59 @@
-# NasaSpace API: контракт для Java-бэкенда
+# NasaSpace API: contract for the Java backend
 
-Документ для разработчиков бэкенда. Машиночитаемая версия: [`openapi.yaml`](./openapi.yaml)
-(OpenAPI 3.1). Типы на стороне фронта: `frontend/src/api/types.ts`, вызовы:
-`frontend/src/api/client.ts`. Эталонное поведение (моки в браузере): `frontend/src/api/mock/`.
+This document is for backend developers. Machine-readable version: [`openapi.yaml`](./openapi.yaml)
+(OpenAPI 3.1). Frontend types: `frontend/src/api/types.ts`, calls:
+`frontend/src/api/client.ts`. Reference behavior (in-browser mocks): `frontend/src/api/mock/`.
 
-Если документ и код расходятся, правда в `types.ts` и `client.ts`. Контракт меняется
-только одновременно в `types.ts` и `openapi.yaml`.
+If this document and the code disagree, `types.ts` and `client.ts` are the source of truth. The contract changes
+only simultaneously in `types.ts` and `openapi.yaml`.
 
-## 1. Соглашения
+## 1. Conventions
 
-| Что | Правило |
+| What | Rule |
 |---|---|
-| Координаты | Планетоцентрические градусы на эллипсоиде Марса. Долгота положительна **на восток**, диапазон **-180..180** (не 0..360). Широта -90..90. |
-| bbox | `[west, south, east, north]` в градусах. Проверка попадания точки включает границы (`>=`, `<=`). |
-| Высоты | Метры относительно ареоида MOLA (уровень "моря" Марса). Могут быть отрицательными (дно Езеро около -2600, вершина Олимпа около 21000+). |
-| Расстояния | Метры. |
-| Уклоны | Градусы. |
-| Длительности | Марсианские сутки (сол). |
-| Радиус Марса | 3 389 500 м (среднее, IAU 2015); на нём считаются расстояния и метры на градус. |
-| Формат | JSON, UTF-8. Поля в camelCase. Все поля, указанные как обязательные, присутствуют всегда. |
+| Coordinates | Planetocentric degrees on the Mars ellipsoid. Longitude is positive **east**, range **-180..180** (not 0..360). Latitude -90..90. |
+| bbox | `[west, south, east, north]` in degrees. The point-in-bbox check is inclusive of the borders (`>=`, `<=`). |
+| Heights | Meters relative to the MOLA areoid (Mars "sea level"). May be negative (the Jezero floor is about -2600, the summit of Olympus about 21000+). |
+| Distances | Meters. |
+| Slopes | Degrees. |
+| Durations | Martian days (sols). |
+| Mars radius | 3,389,500 m (mean, IAU 2015); distances and meters per degree are computed on it. |
+| Format | JSON, UTF-8. Fields in camelCase. All fields marked as required are always present. |
 
-### Раскладка сеток (террейн и слои)
+### Grid layout (terrain and layers)
 
-- Сетка покрывает `bbox` целиком; крайние отсчёты лежат **на границах** bbox
-  (первый столбец на `west`, последний на `east`, первая строка на `north`, последняя на `south`).
-- Порядок: row-major, **от северо-западного угла**: индекс `i = row * width + col`.
-  `row = 0` это северный край, `col = 0` это западный край.
-- `heights.length == width * height` (то же для `values` в слоях).
-- Координаты узла: `lon = west + col / (width - 1) * (east - west)`,
+- The grid covers the whole `bbox`; the outermost samples lie **on the bbox borders**
+  (first column at `west`, last at `east`, first row at `north`, last at `south`).
+- Order: row-major, **starting from the north-west corner**: index `i = row * width + col`.
+  `row = 0` is the north edge, `col = 0` is the west edge.
+- `heights.length == width * height` (same for `values` in layers).
+- Node coordinates: `lon = west + col / (width - 1) * (east - west)`,
   `lat = north - row / (height - 1) * (north - south)`.
-- Моки отдают 257 x 257. Размер может быть другим, фронт читает `width`/`height` из ответа,
-  но рекомендуется 257 (рельеф и маршрутизация на фронте отлажены на нём).
-- `resolution` это расстояние по земле между соседними отсчётами, метры (в моках считается по
-  восточно-западному шагу на средней широте района: `(east - west) / (width - 1) * (π/180 * R * cos(latMid))`).
-- Высоты в моках целые, но тип `number` допускает дробные.
-- Ответы `/terrain` и `/layers` большие (около 66 тыс. чисел), включите gzip.
+- The mocks serve 257 x 257. The size may differ and the frontend reads `width`/`height` from the response,
+  but 257 is recommended (terrain and routing on the frontend are tuned for it).
+- `resolution` is the ground distance between adjacent samples, in meters (the mocks compute it from the
+  east-west step at the mid latitude of the region: `(east - west) / (width - 1) * (π/180 * R * cos(latMid))`).
+- Heights in the mocks are integers, but the `number` type allows fractions.
+- `/terrain` and `/layers` responses are large (about 66 thousand numbers); enable gzip.
 
-### Ошибки
+### Errors
 
-Любой ответ не 2xx обязан иметь JSON-тело:
+Every non-2xx response must have a JSON body:
 
 ```json
-{ "code": "NOT_FOUND", "message": "Район atlantis не найден" }
+{ "code": "NOT_FOUND", "message": "Region atlantis not found" }
 ```
 
-`message` показывается пользователю как есть. Пишите по-русски, коротко, с подсказкой, что
-делать дальше. Если тела нет или оно не JSON, фронт покажет "Ошибка сервера (статус)".
+`message` is shown to the user as is. Write it in English, keep it short, and include a hint about
+what to do next. If there is no body or it is not JSON, the frontend shows "Server error (status)".
 
-## 2. Эндпоинты
+## 2. Endpoints
 
-В примерах `BASE=http://localhost:8080`.
+In the examples `BASE=http://localhost:8080`.
 
 ### GET /regions
 
-Список из 5-6 смоделированных районов. Фронт показывает его в списке районов. Идентификаторы в моках:
+List of 5-6 modeled regions. The frontend shows it in the region list. Identifiers in the mocks:
 `jezero`, `gale`, `olympus`, `melas`, `utopia`, `elysium`.
 
 ```bash
@@ -64,8 +64,8 @@ curl -s "$BASE/regions"
 [
   {
     "id": "jezero",
-    "name": "Кратер Езеро",
-    "summary": "Древнее озеро с дельтой реки, место посадки Perseverance",
+    "name": "Jezero Crater",
+    "summary": "Ancient lake with a river delta, the Perseverance landing site",
     "bbox": [76.9, 17.9, 78.1, 18.9],
     "center": { "lon": 77.5, "lat": 18.4 },
     "baseHeight": -2600
@@ -73,9 +73,9 @@ curl -s "$BASE/regions"
 ]
 ```
 
-Bbox районов из моков:
+Region bboxes from the mocks:
 
-| id | bbox [W, S, E, N] | center | baseHeight, м |
+| id | bbox [W, S, E, N] | center | baseHeight, m |
 |---|---|---|---|
 | jezero | 76.9, 17.9, 78.1, 18.9 | 77.5, 18.4 | -2600 |
 | gale | 136.9, -5.9, 138.3, -4.3 | 137.55, -5.0 | -4500 |
@@ -84,11 +84,11 @@ Bbox районов из моков:
 | utopia | 109.3, 24.6, 110.6, 25.6 | 109.95, 25.1 | -4100 |
 | elysium | 135.0, 4.0, 136.2, 5.0 | 135.6, 4.5 | -2600 |
 
-Поля `shape` и `relief` из моков в контракт **не входят**, их отдавать не нужно.
+The `shape` and `relief` fields from the mocks are **not** part of the contract and must not be returned.
 
 ### GET /terrain/{regionId}
 
-Сетка высот района (`TerrainGrid`).
+Region height grid (`TerrainGrid`).
 
 ```bash
 curl -s "$BASE/terrain/jezero"
@@ -105,18 +105,18 @@ curl -s "$BASE/terrain/jezero"
 }
 ```
 
-(`heights` в примере сокращён: на деле `width * height` значений.)
+(`heights` is abbreviated in the example: in reality it holds `width * height` values.)
 
-Ошибки: `404 NOT_FOUND` для неизвестного `regionId`.
+Errors: `404 NOT_FOUND` for an unknown `regionId`.
 
 ### GET /layers/{regionId}/{kind}
 
-`kind` это `slope` или `hazard`. Раскладка та же, что у террейна (тот же `bbox`, `width`, `height`).
+`kind` is `slope` or `hazard`. The layout is the same as for terrain (same `bbox`, `width`, `height`).
 
-- `slope`: уклон в градусах в каждом узле (в моках центральные разности по высотам с
-  фиксацией на краях сетки, округление до 0.1).
-- `hazard`: опасность 0..1 (в моках `slope / 30 + шум камней`, обрезка до 1).
-  Формула не часть контракта, важен диапазон 0..1.
+- `slope`: slope in degrees at each node (in the mocks, central differences over heights with
+  clamping at the grid edges, rounded to 0.1).
+- `hazard`: hazard 0..1 (in the mocks `slope / 30 + rock noise`, clamped to 1).
+  The formula is not part of the contract; the 0..1 range is what matters.
 
 ```bash
 curl -s "$BASE/layers/jezero/slope"
@@ -133,15 +133,15 @@ curl -s "$BASE/layers/jezero/slope"
 }
 ```
 
-Ошибки: `404 NOT_FOUND` для неизвестного района, `400 BAD_REQUEST` для неизвестного `kind`.
+Errors: `404 NOT_FOUND` for an unknown region, `400 BAD_REQUEST` for an unknown `kind`.
 
 ### GET /places?q=&limit=
 
-Поиск мест. Фронт всегда шлёт `limit=8`. Сопоставление в моках: регистронезависимая подстрока
-по `name` и `description`; пустой `q` возвращает первые `limit` мест. Пустой результат это
-`200 []`. Фронт может отменять запрос (AbortController) при быстром наборе текста.
+Place search. The frontend always sends `limit=8`. Matching in the mocks: case-insensitive substring
+over `name` and `description`; an empty `q` returns the first `limit` places. An empty result is
+`200 []`. The frontend may cancel the request (AbortController) while the user types quickly.
 
-`height` и `slope` это значения рельефа в позиции места (в моках билинейная выборка из сетки).
+`height` and `slope` are the terrain values at the place position (bilinear sampling from the grid in the mocks).
 
 ```bash
 curl -s "$BASE/places?q=Perseverance&limit=8"
@@ -151,31 +151,31 @@ curl -s "$BASE/places?q=Perseverance&limit=8"
 [
   {
     "id": "octavia-butler",
-    "name": "Посадка Perseverance",
+    "name": "Perseverance landing site",
     "kind": "landing-site",
     "regionId": "jezero",
     "position": { "lon": 77.4508, "lat": 18.4447 },
     "height": -2613,
     "slope": 1.8,
-    "description": "Площадка «Октавия Батлер», где Perseverance сел 18 февраля 2021 года."
+    "description": "The Octavia E. Butler landing site, where Perseverance landed on February 18, 2021."
   }
 ]
 ```
 
 `kind`: `landing-site`, `crater`, `mountain`, `canyon`, `plain`, `feature`.
 
-Ошибки: `400 BAD_REQUEST` для некорректного `limit` (не число или меньше 1).
+Errors: `400 BAD_REQUEST` for an invalid `limit` (not a number or less than 1).
 
 ### POST /route
 
-Строит маршрут. Заголовок `Content-Type: application/json`.
+Builds a route. Header `Content-Type: application/json`.
 
-Режимы (эталон `mock/router.ts`, `MODE_LIMITS`):
+Modes (reference `mock/router.ts`, `MODE_LIMITS`):
 
-| mode | макс. уклон | метры за сол |
+| mode | max slope | meters per sol |
 |---|---|---|
-| rover | 20 градусов | 150 |
-| astronaut | 30 градусов | 6000 |
+| rover | 20 degrees | 150 |
+| astronaut | 30 degrees | 6000 |
 
 ```bash
 curl -s -X POST "$BASE/route" \
@@ -196,28 +196,28 @@ curl -s -X POST "$BASE/route" \
 }
 ```
 
-Что требуется от результата (как делает референс):
+What the result must satisfy (as the reference does):
 
-- `points[0]` и `points[last]` совпадают по `lon`/`lat` с `from` и `to` запроса; `distance` первой точки 0,
-  далее накопленная длина вдоль маршрута (метры, в моках целые).
-- `height` и `slope` берутся из террейна в узле.
-- `stats.length` = `distance` последней точки; `ascent` и `descent` это суммы положительных и
-  отрицательных перепадов высоты между соседними точками (**оба неотрицательные**, `descent` положительное число);
-  `maxSlope` максимум `slope` по точкам; `sols = length / метры за сол`, округление до 0.1.
-- Маршрут не должен проходить по узлам с уклоном больше лимита режима.
+- `points[0]` and `points[last]` match `from` and `to` from the request in `lon`/`lat`; `distance` of the first point is 0,
+  then the accumulated length along the route (meters, integers in the mocks).
+- `height` and `slope` are taken from the terrain at the node.
+- `stats.length` = `distance` of the last point; `ascent` and `descent` are the sums of positive and
+  negative height differences between adjacent points (**both non-negative**, `descent` is a positive number);
+  `maxSlope` is the maximum `slope` over the points; `sols = length / meters per sol`, rounded to 0.1.
+- The route must not pass through nodes whose slope exceeds the mode limit.
 
-Ошибки:
+Errors:
 
-- `404 NOT_FOUND`: неизвестный `regionId`.
-- `422 OUT_OF_REGION`: `from` или `to` вне bbox района ("Точка вне зоны: выберите место внутри района").
-- `422 UNREACHABLE`: начальная или конечная точка круче лимита режима ("Точка слишком крутая: больше 20° для этого режима"),
-  либо путь не найден ("Цель недостижима: путь перекрыт слишком крутыми склонами").
-- `400 BAD_REQUEST`: неверное тело (нет полей, неизвестный `mode`, координаты вне допустимых диапазонов).
+- `404 NOT_FOUND`: unknown `regionId`.
+- `422 OUT_OF_REGION`: `from` or `to` is outside the region bbox ("Point is outside the region: pick a spot inside it").
+- `422 UNREACHABLE`: the start or end point is steeper than the mode limit ("Point too steep: more than 20° for this mode"),
+  or no path is found ("Target unreachable: steep slopes block every path").
+- `400 BAD_REQUEST`: invalid body (missing fields, unknown `mode`, coordinates outside the allowed ranges).
 
 ### POST /route/debug?algorithm=astar|dijkstra
 
-Тот же запрос, что `/route`, плюс порядок раскрытия клеток поиска для анимации сравнения A* и Dijkstra
-(`algorithm` обязателен). Ответ `RouteDebug`:
+The same request as `/route`, plus the order in which search cells were expanded, for the A* vs Dijkstra comparison animation
+(`algorithm` is required). The response is `RouteDebug`:
 
 ```bash
 curl -s -X POST "$BASE/route/debug?algorithm=dijkstra" \
@@ -233,16 +233,16 @@ curl -s -X POST "$BASE/route/debug?algorithm=dijkstra" \
 }
 ```
 
-- `visited`: пары `[lon, lat]` в порядке раскрытия (извлечения из очереди). Для A* их заметно меньше, чем для
-  Dijkstra, ради этого сравнения эндпоинт и существует.
-- `route` это `Route` или `null`. **Отличие от `/route`:** когда путь просто не найден, отвечайте `200` и `route: null`.
-  Ошибки `OUT_OF_REGION` и `UNREACHABLE` для слишком крутой начальной/конечной точки остаются `422`, как в `/route`.
-- Ошибки те же, что у `/route`; неизвестный `algorithm` это `400 BAD_REQUEST`.
+- `visited`: `[lon, lat]` pairs in expansion order (the order they are popped from the queue). A* produces noticeably fewer than
+  Dijkstra; this comparison is the reason the endpoint exists.
+- `route` is a `Route` or `null`. **Difference from `/route`:** when no path is found, respond with `200` and `route: null`.
+  The `OUT_OF_REGION` and `UNREACHABLE` errors for a start/end point that is too steep remain `422`, as in `/route`.
+- The errors are the same as for `/route`; an unknown `algorithm` is `400 BAD_REQUEST`.
 
 ### GET /trails?regionId=
 
-Тропы района: рёбра дорожного графа как полилинии. В моках это три маршрута режима `astronaut`
-между фиксированными точками района (идентификаторы вида `jezero-t0`, имена "Тропа 1"). Бэкенд волен отдавать свой граф.
+Region trails: edges of the road graph as polylines. In the mocks these are three `astronaut` mode routes
+between fixed points of the region (identifiers like `jezero-t0`, names "Trail 1"). The backend is free to serve its own graph.
 
 ```bash
 curl -s "$BASE/trails?regionId=jezero"
@@ -253,19 +253,19 @@ curl -s "$BASE/trails?regionId=jezero"
   {
     "id": "jezero-t0",
     "regionId": "jezero",
-    "name": "Тропа 1",
+    "name": "Trail 1",
     "points": [{ "lon": 77.08, "lat": 18.4 }, { "lon": 77.5, "lat": 18.41 }, { "lon": 77.92, "lat": 18.4 }]
   }
 ]
 ```
 
-Ошибки: `404 NOT_FOUND` для неизвестного района. Если троп нет, `200 []`.
+Errors: `404 NOT_FOUND` for an unknown region. If there are no trails, `200 []`.
 
 ### GET /sun?lon=&lat=&sol=&hour=
 
-Положение Солнца. `hour` это местное среднее солнечное время (LMST), часы 0..24, и возвращается как `lmst`.
-`sol` фронт передаёт числом. Эталонная математика: функция `sunState` в `frontend/src/api/mock/index.ts`
-(упрощённая модель Allison and McEwen 2000: солнечная долгота `Ls`, склонение, часовой угол).
+Sun position. `hour` is local mean solar time (LMST), hours 0..24, and is returned as `lmst`.
+The frontend passes `sol` as a number. Reference math: the `sunState` function in `frontend/src/api/mock/index.ts`
+(simplified Allison and McEwen 2000 model: solar longitude `Ls`, declination, hour angle).
 
 ```bash
 curl -s "$BASE/sun?lon=77.45&lat=18.44&sol=120&hour=14.5"
@@ -275,49 +275,49 @@ curl -s "$BASE/sun?lon=77.45&lat=18.44&sol=120&hour=14.5"
 { "sol": 120, "lmst": 14.5, "elevation": 38.2, "azimuth": 262.4, "hoursToSunset": 3.4 }
 ```
 
-- `elevation`: градусы над горизонтом, отрицательно ночью.
-- `azimuth`: градусы по часовой стрелке от севера, 0..360.
-- `hoursToSunset`: часов до заката, `null`, если Солнце под горизонтом.
-- Значения округляются до 0.1.
+- `elevation`: degrees above the horizon, negative at night.
+- `azimuth`: degrees clockwise from north, 0..360.
+- `hoursToSunset`: hours until sunset, `null` if the Sun is below the horizon.
+- Values are rounded to 0.1.
 
-Ошибки: `400 BAD_REQUEST` для нечисловых или внеплановых значений (`hour` вне 0..24, `lat` вне -90..90).
+Errors: `400 BAD_REQUEST` for non-numeric or out-of-range values (`hour` outside 0..24, `lat` outside -90..90).
 
-## 3. Коды ошибок
+## 3. Error codes
 
-| HTTP | code | Когда |
+| HTTP | code | When |
 |---|---|---|
-| 400 | `BAD_REQUEST` | Невалидные параметры запроса или тело: неизвестный `kind`, `mode`, `algorithm`; нечисловые `lon`/`lat`/`sol`/`hour`; отсутствуют обязательные поля; битый JSON. |
-| 404 | `NOT_FOUND` | Неизвестный `regionId` (в пути или в `regionId` запроса/тела). Неизвестный путь тоже. |
-| 422 | `OUT_OF_REGION` | `from` или `to` вне bbox района (только маршруты). |
-| 422 | `UNREACHABLE` | Начальная или конечная точка круче лимита режима, либо путь между точками не найден (только `/route`; в `/route/debug` второй случай даёт `200` и `route: null`). |
-| 500 | `INTERNAL` | Любая непредвиденная ошибка. Тело всё равно `{code, message}`, не stack trace. |
+| 400 | `BAD_REQUEST` | Invalid request parameters or body: unknown `kind`, `mode`, `algorithm`; non-numeric `lon`/`lat`/`sol`/`hour`; missing required fields; malformed JSON. |
+| 404 | `NOT_FOUND` | Unknown `regionId` (in the path or in the request/body `regionId`). Also an unknown path. |
+| 422 | `OUT_OF_REGION` | `from` or `to` is outside the region bbox (routes only). |
+| 422 | `UNREACHABLE` | The start or end point is steeper than the mode limit, or no path exists between the points (`/route` only; in `/route/debug` the second case gives `200` and `route: null`). |
+| 500 | `INTERNAL` | Any unexpected error. The body is still `{code, message}`, never a stack trace. |
 
-Не используйте другие `code`: `ApiErrorCode` на фронте это ровно эти пять значений.
+Do not use other `code` values: `ApiErrorCode` on the frontend is exactly these five values.
 
 ## 4. CORS
 
-Фронт ходит в бэкенд из браузера с другого origin, поэтому бэкенд обязан разрешить:
+The frontend calls the backend from the browser on a different origin, so the backend must allow:
 
-- точный домен проекта на Vercel (продакшн), например `https://nasaspace.vercel.app`;
-- превью-деплои только этого проекта по шаблону с именем проекта, например `https://nasaspace-*-<team>.vercel.app`.
-  **Не** разрешайте `*.vercel.app` целиком: так доступ получит любой чужой сайт на Vercel;
-- `http://localhost:5173` (Vite dev-сервер).
+- the exact project domain on Vercel (production), for example `https://nasaspace.vercel.app`;
+- preview deployments of this project only, using a pattern with the project name, for example `https://nasaspace-*-<team>.vercel.app`.
+  Do **not** allow all of `*.vercel.app`: that would give access to any third-party site on Vercel;
+- `http://localhost:5173` (Vite dev server).
 
-В Spring используйте `allowedOriginPatterns` (не `allowedOrigins("*")`). Методы: `GET`, `POST`, `OPTIONS`.
-Заголовки: `Content-Type`, `Accept`. `allowCredentials(false)`: куки и авторизация не используются.
-`POST` с `Content-Type: application/json` вызывает preflight `OPTIONS`, он должен отвечать `2xx`.
-Origins выносите в конфигурацию. CORS-заголовки должны быть и на ответах с ошибками (включая 429).
-Если когда-нибудь появится авторизация или куки, разрешайте только точные origins, без шаблонов.
+In Spring use `allowedOriginPatterns` (not `allowedOrigins("*")`). Methods: `GET`, `POST`, `OPTIONS`.
+Headers: `Content-Type`, `Accept`. `allowCredentials(false)`: cookies and authorization are not used.
+A `POST` with `Content-Type: application/json` triggers a preflight `OPTIONS`, which must respond with `2xx`.
+Move origins into configuration. CORS headers must also be present on error responses (including 429).
+If authorization or cookies ever appear, allow only exact origins, with no patterns.
 
-## 5. Как фронтенд переключается с моков на бэкенд
+## 5. How the frontend switches from mocks to the backend
 
-В `frontend/src/api/client.ts` базовый адрес берётся из переменной окружения `VITE_API_URL`
-(завершающие `/` обрезаются):
+In `frontend/src/api/client.ts` the base URL comes from the `VITE_API_URL` environment variable
+(trailing `/` are trimmed):
 
-- `VITE_API_URL` пуст или не задан: всё работает на моках в браузере (режим по умолчанию, бэкенд не нужен).
-- `VITE_API_URL=http://localhost:8080`: фронт делает реальные запросы `fetch(`${VITE_API_URL}${path}`)`.
+- `VITE_API_URL` empty or unset: everything runs on in-browser mocks (the default mode, no backend needed).
+- `VITE_API_URL=http://localhost:8080`: the frontend makes real requests with `fetch(`${VITE_API_URL}${path}`)`.
 
-Локально:
+Locally:
 
 ```bash
 # frontend/.env.local
@@ -325,69 +325,68 @@ VITE_API_URL=http://localhost:8080
 npm --prefix frontend run dev      # http://localhost:5173
 ```
 
-На Vercel: переменная `VITE_API_URL` в настройках проекта (Environment Variables), значение
-публичный адрес бэкенда. **В продакшне это обязательно `https://`** (страница на https не сможет звать http, браузер заблокирует); после изменения нужен новый деплой (Vite вшивает значение при сборке).
-Пути не содержат префикса: `GET {VITE_API_URL}/regions`, а не `/api/regions`. Если бэкенд живёт под префиксом,
-укажите его в самом `VITE_API_URL` (например `https://host/api`).
+On Vercel: the `VITE_API_URL` variable in the project settings (Environment Variables), whose value is the
+public backend address. **In production it must be `https://`** (a page served over https cannot call http, the browser blocks it); a new deploy is needed after changing it (Vite inlines the value at build time).
+Paths have no prefix: `GET {VITE_API_URL}/regions`, not `/api/regions`. If the backend lives under a prefix,
+put it in `VITE_API_URL` itself (for example `https://host/api`).
 
-Если запрос вообще не прошёл (сеть, CORS, бэкенд не запущен), фронт показывает
-"Сервер маршрутов не отвечает. Проверьте, что бэкенд запущен".
+If the request fails entirely (network, CORS, backend not running), the frontend shows
+"The route server is not responding. Check that the backend is running".
 
-### Генерация типов из Swagger
+### Generating types from Swagger
 
-Когда бэкенд публикует OpenAPI (springdoc: `/v3/api-docs`), фронт может перегенерировать TypeScript-типы
-через `openapi-typescript` (в `frontend/package.json` есть скрипт `api:types`:
-`openapi-typescript ../docs/openapi.yaml -o src/api/schema.gen.ts`). Можно направить его на живой Swagger бэкенда
-(`openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.gen.ts`) и сверить с `types.ts`.
-Для этого OpenAPI бэкенда должен совпадать с `docs/openapi.yaml` по именам полей и схемам.
+When the backend publishes OpenAPI (springdoc: `/v3/api-docs`), the frontend can regenerate the TypeScript types
+with `openapi-typescript` (`frontend/package.json` has an `api:types` script:
+`openapi-typescript ../docs/openapi.yaml -o src/api/schema.gen.ts`). You can point it at the backend's live Swagger
+(`openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.gen.ts`) and compare against `types.ts`.
+For that, the backend OpenAPI must match `docs/openapi.yaml` in field names and schemas.
 
-## 6. Чек-лист: как проверить, что бэкенд совместим
+## 6. Checklist: verifying backend compatibility
 
-1. [ ] `GET /regions` возвращает 5-6 районов; у каждого `id`, `name`, `summary`, `bbox` (4 числа W,S,E,N), `center`, `baseHeight`.
-2. [ ] `GET /terrain/{id}` для каждого района: `heights.length == width * height`, порядок row-major от северо-западного угла,
-   `bbox` совпадает с регионом, `resolution` в метрах.
-3. [ ] Рельеф визуально правильный: север сверху (в узле `row=0` высоты северного края), запад слева. Проверка: для Gale гора Шарп восточнее и южнее центра.
-4. [ ] `GET /layers/{id}/slope` и `/hazard`: тот же `width`/`height`/`bbox`, `slope` в градусах, `hazard` в 0..1.
-5. [ ] `GET /places?q=&limit=8`: пустой `q` даёт места, неизвестный текст даёт `[]` и `200`; у каждого места `height`, `slope`, `regionId`, `position`.
-6. [ ] `POST /route` rover и astronaut в одном районе: первая/последняя точка равны `from`/`to`, `distance` монотонно растёт с 0,
-   `stats.length` равна `distance` последней точки, `stats.sols` равны `length / 150` (rover) или `length / 6000` (astronaut), округление 0.1.
-7. [ ] Маршрут rover не содержит точек с `slope > 20`, astronaut с `slope > 30`.
-8. [ ] `POST /route` с точкой вне bbox даёт `422 OUT_OF_REGION`; с точкой на крутом склоне даёт `422 UNREACHABLE`; с неизвестным районом даёт `404 NOT_FOUND`; с `mode: "x"` даёт `400 BAD_REQUEST`.
-9. [ ] `POST /route/debug?algorithm=astar` и `=dijkstra`: `visited` непустой, у A* заметно меньше, чем у Dijkstra на той же паре точек; `route` совпадает по длине (оба оптимальны).
-10. [ ] `GET /trails?regionId=` возвращает массив полилиний `{id, regionId, name, points[]}` с точками внутри bbox.
-11. [ ] `GET /sun`: ночью `elevation < 0` и `hoursToSunset: null`; днём `hoursToSunset` число; `lmst` равно переданному `hour`.
-12. [ ] Все ошибки 4xx/5xx это JSON `{code, message}` с одним из пяти кодов, `message` по-русски.
+1. [ ] `GET /regions` returns 5-6 regions; each has `id`, `name`, `summary`, `bbox` (4 numbers W,S,E,N), `center`, `baseHeight`.
+2. [ ] `GET /terrain/{id}` for each region: `heights.length == width * height`, row-major order from the north-west corner,
+   `bbox` matches the region, `resolution` in meters.
+3. [ ] Terrain looks right visually: north is up (node `row=0` holds the north-edge heights), west is left. Check: in Gale, Mount Sharp lies east and south of the center.
+4. [ ] `GET /layers/{id}/slope` and `/hazard`: same `width`/`height`/`bbox`, `slope` in degrees, `hazard` in 0..1.
+5. [ ] `GET /places?q=&limit=8`: an empty `q` returns places, unknown text returns `[]` with `200`; each place has `height`, `slope`, `regionId`, `position`.
+6. [ ] `POST /route` rover and astronaut in one region: the first/last point equal `from`/`to`, `distance` grows monotonically from 0,
+   `stats.length` equals `distance` of the last point, `stats.sols` equals `length / 150` (rover) or `length / 6000` (astronaut), rounded to 0.1.
+7. [ ] A rover route contains no points with `slope > 20`, an astronaut route none with `slope > 30`.
+8. [ ] `POST /route` with a point outside the bbox gives `422 OUT_OF_REGION`; with a point on a steep slope gives `422 UNREACHABLE`; with an unknown region gives `404 NOT_FOUND`; with `mode: "x"` gives `400 BAD_REQUEST`.
+9. [ ] `POST /route/debug?algorithm=astar` and `=dijkstra`: `visited` is non-empty, and A* has noticeably fewer entries than Dijkstra for the same pair of points; `route` has the same length (both are optimal).
+10. [ ] `GET /trails?regionId=` returns an array of polylines `{id, regionId, name, points[]}` with points inside the bbox.
+11. [ ] `GET /sun`: at night `elevation < 0` and `hoursToSunset: null`; by day `hoursToSunset` is a number; `lmst` equals the passed `hour`.
+12. [ ] All 4xx/5xx errors are JSON `{code, message}` with one of the five codes, and `message` is in English.
 13. [ ] CORS: `curl -i -X OPTIONS "$BASE/route" -H "Origin: http://localhost:5173" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type"`
-    отвечает `2xx` с `Access-Control-Allow-Origin: http://localhost:5173`.
-14. [ ] (проверка) раздел 7 выполнен: валидация границ, rate limit, лимит тела, нет stack trace в ответах. Swagger бэкенда (`/v3/api-docs`) валиден и совпадает с `docs/openapi.yaml`; `openapi-typescript` генерирует типы без ошибок, `tsc` на фронте проходит.
-15. [ ] Фронт с `VITE_API_URL=http://localhost:8080`: открыть район, построить маршрут, включить слои уклона и опасности, поиск, троп и Солнце, без ошибок в консоли и вкладке Network.
+    responds `2xx` with `Access-Control-Allow-Origin: http://localhost:5173`.
+14. [ ] (review) Section 7 is done: bounds validation, rate limit, body size limit, no stack traces in responses. The backend Swagger (`/v3/api-docs`) is valid and matches `docs/openapi.yaml`; `openapi-typescript` generates types without errors, `tsc` on the frontend passes.
+15. [ ] Frontend with `VITE_API_URL=http://localhost:8080`: open a region, build a route, enable the slope and hazard layers, search, trails and the Sun, with no errors in the console or the Network tab.
 
-## 7. Безопасность и лимиты
+## 7. Security and limits
 
-Рекомендации для бэкенда. Бэкенд публичный и без авторизации, поиск маршрута дорогой по CPU.
+Recommendations for the backend. The backend is public and has no authorization, and route search is CPU-expensive.
 
-- **Валидация входа**: Bean Validation на DTO. `@Valid` на `@RequestBody`, `@Validated` на контроллерах с параметрами.
-  `@DecimalMin/@DecimalMax` для `lon` (-180..180), `lat` (-90..90), `sol` (0..100000), `hour` (0..24);
-  `@Min(1) @Max(50)` для `limit`; `@Size(max = 100)` для `q`; `@Pattern(regexp = "^[a-z0-9-]{1,32}$")` для `regionId`;
-  `@NotNull` на `mode`, `from`, `to`. Нарушения превращайте в `400 BAD_REQUEST`. Границы такие же, как в `openapi.yaml`.
-- **Одинаковые A и B**: если обе точки попадают в один узел сетки, `400 BAD_REQUEST`
-  «Точки А и Б слишком близко: отодвиньте одну из них» (мок делает так же).
-- **Ограничение параллелизма**: `Semaphore` на число одновременных поисков маршрута (например, по числу ядер);
-  при нехватке слота ждите недолго и отвечайте `429`.
-- **Rate limit по IP** (например, Bucket4j): около 10 запросов/с на `/route`, 1 запрос/с на `/route/debug`
-  (он тяжелее и отдаёт до 100 000 клеток). Ответ `429` с `{code, message}` и заголовком `Retry-After`.
-  Для 429 используйте код `TOO_MANY_REQUESTS` и заголовок `Retry-After`.
-  За прокси берите реальный IP из доверенного `X-Forwarded-For`, не из произвольного заголовка клиента.
-- **Размер тела**: отклоняйте POST больше 4 КБ (`413` или `400`); нормальный запрос около 150 байт.
-- **Таймаут поиска**: ограничьте время одного поиска (например, 5-10 с); по истечении `500 INTERNAL` с общим сообщением.
-- **Кэш** результатов по ключу `(regionId, округлённые from/to, mode)`; округление, например, до узла сетки.
-  Сетки неизменяемы, поэтому кэш безопасен.
-- **Ошибки**: `server.error.include-stacktrace=never`, `server.error.include-message=never` (свои сообщения даёт `@RestControllerAdvice`).
-  Не вставляйте в `message` сырой пользовательский ввод (id района, строку поиска): используйте фиксированные тексты.
-  Для `NOT_FOUND` лучше "Район не найден", а не "Район <ввод> не найден".
-- **Swagger**: `/swagger-ui.html` и `/v3/api-docs` в продакшне отключите (`springdoc.api-docs.enabled=false`,
-  `springdoc.swagger-ui.enabled=false`) либо оставляйте сознательно для демо.
-- **Actuator**: не открывайте без ограничений; если нужен, только `health`, и не на публичный интерфейс.
-- **Логи**: access-логи без тел запросов и без лишних персональных данных.
-- **Транспорт**: только HTTPS в продакшне; CORS по разделу 4.
-
+- **Input validation**: Bean Validation on DTOs. `@Valid` on `@RequestBody`, `@Validated` on controllers with parameters.
+  `@DecimalMin/@DecimalMax` for `lon` (-180..180), `lat` (-90..90), `sol` (0..100000), `hour` (0..24);
+  `@Min(1) @Max(50)` for `limit`; `@Size(max = 100)` for `q`; `@Pattern(regexp = "^[a-z0-9-]{1,32}$")` for `regionId`;
+  `@NotNull` on `mode`, `from`, `to`. Turn violations into `400 BAD_REQUEST`. The bounds are the same as in `openapi.yaml`.
+- **Identical A and B**: if both points fall into the same grid node, respond `400 BAD_REQUEST`
+  "Points A and B are too close: move one of them" (the mock does the same).
+- **Concurrency limit**: a `Semaphore` on the number of simultaneous route searches (for example, the number of cores);
+  when no slot is free, wait briefly and respond `429`.
+- **Per-IP rate limit** (for example, Bucket4j): about 10 requests/s on `/route`, 1 request/s on `/route/debug`
+  (it is heavier and returns up to 100,000 cells). Respond `429` with `{code, message}` and a `Retry-After` header.
+  For 429 use the code `TOO_MANY_REQUESTS` and the `Retry-After` header. Example message: "Too many requests. Wait a second and try again".
+  Behind a proxy, take the real IP from a trusted `X-Forwarded-For`, not from an arbitrary client header.
+- **Body size**: reject POSTs larger than 4 KB (`413` or `400`); a normal request is about 150 bytes.
+- **Search timeout**: bound the time of a single search (for example, 5-10 s); on expiry respond `500 INTERNAL` with a generic message.
+- **Cache** results by key `(regionId, rounded from/to, mode)`; rounding to the grid node, for example.
+  Grids are immutable, so the cache is safe.
+- **Errors**: `server.error.include-stacktrace=never`, `server.error.include-message=never` (your own messages come from `@RestControllerAdvice`).
+  Do not put raw user input (region id, search string) into `message`: use fixed texts.
+  For `NOT_FOUND`, prefer "Region not found" over "Region <input> not found".
+- **Swagger**: disable `/swagger-ui.html` and `/v3/api-docs` in production (`springdoc.api-docs.enabled=false`,
+  `springdoc.swagger-ui.enabled=false`) or leave them on deliberately for a demo.
+- **Actuator**: do not expose it without restrictions; if needed, only `health`, and not on the public interface.
+- **Logs**: access logs without request bodies and without excess personal data.
+- **Transport**: HTTPS only in production; CORS per section 4.

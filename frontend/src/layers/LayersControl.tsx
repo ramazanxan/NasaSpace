@@ -43,7 +43,7 @@ function DataLayer({ kind, label }: { kind: LayerKind; label: string }) {
         <div className="layer-item__body">
           <Legend kind={kind} />
           <Slider
-            label="Видимость"
+            label="Opacity"
             value={layer.opacity}
             min={0.1}
             max={1}
@@ -57,7 +57,7 @@ function DataLayer({ kind, label }: { kind: LayerKind; label: string }) {
   )
 }
 
-/** "Слои" button in the map toolbar with a small popover of overlays. */
+/** "Layers" button in the map toolbar with a small popover of overlays. */
 export function LayersControl() {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -102,7 +102,7 @@ export function LayersControl() {
         onClick={() => setOpen((v) => !v)}
       >
         <Layers size={16} strokeWidth={1.5} aria-hidden />
-        Слои
+        Layers
       </button>
       {open && (
         <div
@@ -110,22 +110,22 @@ export function LayersControl() {
           id={popId}
           className="layers-pop"
           role="dialog"
-          aria-label="Слои карты"
+          aria-label="Map layers"
           onBlur={(e) => {
             if (!rootRef.current?.contains(e.relatedTarget as Node | null) && e.relatedTarget) setOpen(false)
           }}
         >
           {regionActive ? (
             <>
-              <DataLayer kind="slope" label="Уклон" />
-              <DataLayer kind="hazard" label="Опасность" />
-              <Toggle label="Тропы" checked={showTrails} onChange={setShowTrails} />
+              <DataLayer kind="slope" label="Slope" />
+              <DataLayer kind="hazard" label="Hazard" />
+              <Toggle label="Trails" checked={showTrails} onChange={setShowTrails} />
               {showTrails && trailsError && <Notice tone="error">{trailsError}</Notice>}
             </>
           ) : (
-            <p className="layers-pop__note">Уклон, опасность и тропы видны внутри района. Откройте район в списке слева.</p>
+            <p className="layers-pop__note">Slope, hazard and trails are shown inside a region. Open a region from the list on the left</p>
           )}
-          <Toggle label="Роверы" checked={showRovers} onChange={setShowRovers} />
+          <Toggle label="Rovers" checked={showRovers} onChange={setShowRovers} />
         </div>
       )}
     </div>

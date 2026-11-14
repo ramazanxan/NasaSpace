@@ -12,8 +12,8 @@ import { useRouteRequest } from './useRouteRequest'
 import './route.css'
 
 const MODES: { value: TravelMode; label: string; icon: ReactNode }[] = [
-  { value: 'rover', label: 'Ровер', icon: <Truck size={16} strokeWidth={1.5} aria-hidden /> },
-  { value: 'astronaut', label: 'Астронавт', icon: <Footprints size={16} strokeWidth={1.5} aria-hidden /> },
+  { value: 'rover', label: 'Rover', icon: <Truck size={16} strokeWidth={1.5} aria-hidden /> },
+  { value: 'astronaut', label: 'Astronaut', icon: <Footprints size={16} strokeWidth={1.5} aria-hidden /> },
 ]
 
 function PointRow({ which, point }: { which: 'from' | 'to'; point: LonLat | null }) {
@@ -28,11 +28,11 @@ function PointRow({ which, point }: { which: 'from' | 'to'; point: LonLat | null
         {label}
       </span>
       <span className="route-point__text" aria-live={picking ? 'polite' : undefined}>
-        <span className="sr-only">Точка {label}: </span>
-        {picking ? 'Кликните по карте' : point ? formatCoord(point) : 'Не выбрана'}
+        <span className="sr-only">Point {label}: </span>
+        {picking ? 'Click on the map' : point ? formatCoord(point) : 'Not set'}
       </span>
       <IconButton
-        label={picking ? 'Отменить выбор на карте' : `Выбрать точку ${label} на карте`}
+        label={picking ? 'Cancel picking on the map' : `Pick point ${label} on the map`}
         aria-pressed={picking}
         className="route-point__pick"
         onClick={() => setPick(picking ? null : which)}
@@ -40,7 +40,7 @@ function PointRow({ which, point }: { which: 'from' | 'to'; point: LonLat | null
         <Crosshair size={16} strokeWidth={1.5} aria-hidden />
       </IconButton>
       <IconButton
-        label={`Убрать точку ${label}`}
+        label={`Remove point ${label}`}
         onClick={() => setPoint(which, null)}
         disabled={!point}
         className="route-point__clear"
@@ -59,12 +59,12 @@ function RouteStats() {
   return (
     <div className="route-stats" data-stale={status === 'loading' || undefined} aria-busy={status === 'loading'}>
       <div className="route-stats__main">
-        <Stat label="Длина маршрута" value={fmt.km(length)} unit={fmt.kmUnit(length)} />
+        <Stat label="Route length" value={fmt.km(length)} unit={fmt.kmUnit(length)} />
       </div>
       <div className="route-stats__row">
-        <Stat label="Набор высоты" value={fmt.int(ascent)} unit="м" />
-        <Stat label="Макс. уклон" value={fmt.deg(maxSlope)} unit="°" />
-        <Stat label="В пути" value={sols.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} unit={solWord(sols)} />
+        <Stat label="Ascent" value={fmt.int(ascent)} unit="m" />
+        <Stat label="Max slope" value={fmt.deg(maxSlope)} unit="°" />
+        <Stat label="Travel time" value={sols.toLocaleString('en-US', { maximumFractionDigits: 1 })} unit={solWord(sols)} />
       </div>
     </div>
   )
@@ -98,9 +98,9 @@ export function RoutePanel() {
     return (
       <section className="route-panel" aria-labelledby="route-title">
         <h2 id="route-title" className="route-panel__title">
-          Маршрут
+          Route
         </h2>
-        <p className="route-empty">Откройте район на карте или в списке, чтобы проложить маршрут</p>
+        <p className="route-empty">Open a region on the map or in the list to plan a route</p>
       </section>
     )
   }
@@ -114,11 +114,11 @@ export function RoutePanel() {
     <section className="route-panel" aria-labelledby="route-title">
       <div className="route-panel__head">
         <h2 id="route-title" className="route-panel__title">
-          Маршрут
+          Route
         </h2>
         <span className="route-panel__region">{region.name}</span>
         {(from || to) && (
-          <IconButton label="Сбросить маршрут" onClick={clearRoute} className="route-panel__reset">
+          <IconButton label="Reset route" onClick={clearRoute} className="route-panel__reset">
             <RotateCcw size={16} strokeWidth={1.5} aria-hidden />
           </IconButton>
         )}
@@ -129,27 +129,27 @@ export function RoutePanel() {
           <PointRow which="from" point={from} />
           <PointRow which="to" point={to} />
         </div>
-        <IconButton label="Поменять точки местами" onClick={swap} disabled={!from && !to} className="route-points__swap">
+        <IconButton label="Swap points" onClick={swap} disabled={!from && !to} className="route-points__swap">
           <ArrowUpDown size={16} strokeWidth={1.5} aria-hidden />
         </IconButton>
       </div>
 
       <div className="route-mode">
-        <Segmented label="Способ передвижения" value={mode} options={MODES} onChange={setMode} />
+        <Segmented label="Travel mode" value={mode} options={MODES} onChange={setMode} />
         <p className="route-mode__hint">{modeHint(mode)}</p>
       </div>
 
       {!from || !to ? (
         <p className="route-empty">
           {pick
-            ? 'Esc — отменить выбор'
-            : 'Задайте точки А и Б кнопкой с прицелом или из карточки места'}
+            ? 'Esc to cancel picking'
+            : 'Set points A and B with the crosshair button or from a place card'}
         </p>
       ) : (
         <>
           {status === 'loading' && !route && (
             <p className="route-status" role="status">
-              Прокладываем маршрут…
+              Planning route…
             </p>
           )}
           {status === 'error' && error && (
@@ -161,7 +161,7 @@ export function RoutePanel() {
                 icon={<RotateCcw size={16} strokeWidth={1.5} aria-hidden />}
                 onClick={() => setRetry((n) => n + 1)}
               >
-                Повторить
+                Retry
               </Button>
               )}
             </div>

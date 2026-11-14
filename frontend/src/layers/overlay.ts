@@ -32,7 +32,7 @@ function checkGrid(grid: LayerGrid, kind: LayerKind): LayerGrid {
     Array.isArray(grid.bbox) &&
     grid.bbox.length === 4 &&
     grid.bbox.every(Number.isFinite)
-  if (!ok) throw new Error(`Некорректная сетка слоя ${kind}`)
+  if (!ok) throw new Error(`Invalid grid for layer ${kind}`)
   return grid
 }
 
@@ -41,7 +41,7 @@ function paint(grid: LayerGrid): string {
   canvas.width = grid.width
   canvas.height = grid.height
   const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas 2D недоступен')
+  if (!ctx) throw new Error('Canvas 2D is unavailable')
   const img = ctx.createImageData(grid.width, grid.height)
   const stops = RAMPS[grid.kind]
   // Grid is row-major from the north-west corner, same as canvas pixels.
