@@ -1,0 +1,17 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: добавить шаги деплоя под выбранную платформу
+      # (Vercel / Netlify / GitHub Pages / сервер по SSH и т.д.).
+      # Ключи кладём в Settings → Secrets and variables → Actions.
+      - run: echo "Здесь будет деплой"
