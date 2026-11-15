@@ -22,4 +22,4 @@ mars:
   max-concurrent-searches: 4
   max-body-bytes: 8192
   cors:
-    allowed-origins: http://localhost:5173,https://*.vercel.app
+    allowed-origins: http://localhost:*,http://127.0.0.1:*,https://*.vercel.app

@@ -157,8 +157,13 @@
 
 .place__actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
   gap: var(--s-2);
+}
+
+.place__actions .btn {
+  padding-inline: var(--s-3);
+  font-size: var(--fs-13);
 }
 
 .place__action[aria-pressed='true'] {

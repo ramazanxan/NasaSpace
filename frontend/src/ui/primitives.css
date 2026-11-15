@@ -14,8 +14,10 @@
   align-items: center;
   justify-content: center;
   gap: var(--s-2);
-  height: 36px;
-  padding: 0 var(--s-4);
+  min-height: 36px;
+  padding: 6px var(--s-4);
+  line-height: 1.25;
+  text-align: center;
   border: 1px solid transparent;
   border-radius: var(--r-control);
   font-size: var(--fs-14);
