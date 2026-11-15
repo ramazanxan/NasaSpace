@@ -20,8 +20,9 @@ import type {
  */
 
 const configured = (import.meta.env.VITE_API_URL ?? '').trim()
-const ROOT = (configured || (import.meta.env.DEV ? 'http://localhost:9090' : '')).replace(/\/+$/, '')
-const BASE = ROOT ? `${ROOT}/api/v1` : ''
+// In dev the Vite server proxies /api to the Java backend (see vite.config.ts), so one origin serves both.
+const ROOT = configured.replace(/\/+$/, '')
+const BASE = ROOT ? `${ROOT}/api/v1` : import.meta.env.DEV ? '/api/v1' : ''
 
 /** False when the build has no backend URL at all (static demo). */
 export const backendConfigured = BASE !== ''

@@ -11,6 +11,12 @@ export default defineConfig(({ mode }) => {
     throw new Error('VITE_API_URL must use https:// in production builds (mixed content is blocked)')
   }
   return {
+    server: {
+      // One public link for demos: the dev server forwards API calls to the Java backend,
+      // and accepts requests coming through a Cloudflare quick tunnel.
+      proxy: { '/api': 'http://localhost:9090' },
+      allowedHosts: ['.trycloudflare.com'],
+    },
   plugins: [
     react(),
     viteStaticCopy({
