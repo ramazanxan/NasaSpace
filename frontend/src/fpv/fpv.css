@@ -1,0 +1,336 @@
+/* While driving, the planning panels step aside and the map fills the screen. */
+body.fpv-on .panel,
+body.fpv-on .map-tools,
+body.fpv-on .dock {
+  display: none;
+}
+
+.fpv {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  --fpv-glass: rgba(21, 23, 26, 0.86);
+}
+
+.fpv > * {
+  pointer-events: auto;
+}
+
+.fpv__look {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.fpv__look:active {
+  cursor: grabbing;
+}
+
+/* ---------- top bar: title, compass, exit ---------- */
+
+.fpv__top {
+  position: absolute;
+  top: var(--s-4);
+  left: var(--s-4);
+  right: var(--s-4);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: var(--s-4);
+  pointer-events: none;
+}
+
+.fpv__top > * {
+  pointer-events: auto;
+}
+
+.fpv__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s-2) var(--s-3);
+  justify-self: start;
+  background: var(--fpv-glass);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+}
+
+.fpv__name {
+  font-weight: 500;
+}
+
+.fpv__state {
+  font-size: var(--fs-12);
+  color: var(--c-warn);
+}
+
+.fpv__state.is-on {
+  color: var(--c-ok);
+}
+
+.fpv__compass {
+  position: relative;
+  width: 360px;
+  height: 40px;
+  overflow: hidden;
+  background: var(--fpv-glass);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+}
+
+.fpv__tape {
+  position: absolute;
+  top: 0;
+  left: 180px; /* centre of the strip */
+  height: 100%;
+  will-change: transform;
+}
+
+.fpv__tick {
+  position: absolute;
+  top: 6px;
+  width: 1px;
+  height: 6px;
+  background: var(--c-text-3);
+  transform: translateX(-360px); /* tape starts at −90° */
+}
+
+.fpv__tick.is-major {
+  height: 10px;
+  background: var(--c-text);
+}
+
+.fpv__tick em {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-style: normal;
+  font-size: var(--fs-12);
+  color: var(--c-text-2);
+  white-space: nowrap;
+}
+
+.fpv__tick.is-major em {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.fpv__needle {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 100%;
+  margin-left: -1px;
+  background: var(--c-accent);
+}
+
+.fpv__exit {
+  justify-self: end;
+  background: var(--fpv-glass);
+  border: 1px solid var(--c-line);
+}
+
+/* ---------- hazard strip ---------- */
+
+.fpv__warn {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(520px, calc(100% - 32px));
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--r-card);
+  background: rgba(60, 24, 20, 0.88);
+  color: var(--c-danger-text);
+  box-shadow: inset 0 0 0 1px var(--c-danger-line);
+  font-size: var(--fs-13);
+  text-align: center;
+}
+
+/* ---------- telemetry side card ---------- */
+
+.fpv__side {
+  position: absolute;
+  top: 76px;
+  right: var(--s-4);
+  width: 264px;
+  max-height: calc(100% - 76px - 128px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  background: var(--fpv-glass);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-panel);
+}
+
+.fpv__mini {
+  width: 100%;
+  height: auto;
+  border-radius: var(--r-control);
+  background: var(--c-ground);
+}
+
+.fpv__mini-route {
+  fill: none;
+  stroke: var(--c-accent);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.fpv__mini-cone {
+  fill: rgba(236, 232, 225, 0.12);
+}
+
+.fpv__mini-dot {
+  fill: var(--c-text);
+  stroke: var(--c-ground);
+  stroke-width: 2;
+}
+
+.fpv__mini-start {
+  fill: var(--c-ok);
+}
+
+.fpv__mini-goal {
+  fill: var(--c-accent);
+  stroke: var(--c-text);
+  stroke-width: 1.5;
+}
+
+.fpv__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.fpv__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  font-size: var(--fs-13);
+}
+
+.fpv__row dt {
+  color: var(--c-text-3);
+}
+
+.fpv__row dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 500;
+}
+
+.fpv__risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fpv__risk i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-ok);
+}
+
+.fpv__risk--moderate i {
+  background: var(--c-warn);
+}
+
+.fpv__risk--high i {
+  background: var(--c-danger);
+}
+
+.fpv__why {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--c-text-2);
+}
+
+.fpv__keys {
+  margin: 0;
+  font-size: var(--fs-12);
+  color: var(--c-text-3);
+}
+
+/* ---------- bottom: progress and controls ---------- */
+
+.fpv__bottom {
+  position: absolute;
+  left: var(--s-4);
+  right: calc(264px + var(--s-8));
+  bottom: var(--s-4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  background: var(--fpv-glass);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-panel);
+}
+
+.fpv__progress {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.fpv__figures {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-13);
+  color: var(--c-text-2);
+}
+
+.fpv__figures strong {
+  color: var(--c-text);
+  font-weight: 500;
+}
+
+.fpv__bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--c-overlay);
+  overflow: hidden;
+}
+
+.fpv__fill {
+  height: 100%;
+  background: var(--c-accent);
+  transform-origin: left center;
+  transform: scaleX(0);
+  will-change: transform;
+}
+
+.fpv__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.fpv__controls .segmented {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .fpv__compass {
+    width: 220px;
+  }
+  .fpv__side {
+    display: none;
+  }
+  .fpv__bottom {
+    right: var(--s-4);
+  }
+}

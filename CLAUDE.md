@@ -6,7 +6,7 @@ Competition rule: **every data value comes from NASA Mars Trek** (trek.nasa.gov)
 terrain, no mock numbers.
 
 - `frontend/` — Vite + React 19 + TypeScript, Cesium (Mars ellipsoid), Zustand, Recharts, lucide-react.
-- `backend/` — Java 21, Spring Boot 4 (package `com.example.nasaproject`), no database. A hex grid
+- `backend/` — Java 25, Spring Boot 4 (package `com.example.nasaproject`), no database. A hex grid
   (`data/grid.geojson`, ~1° cells, western hemisphere for now) with slope from the team's zonal
   stats, plus elevation (MOLA), dust index and thermal inertia (TES) sampled from Trek tiles into
   `data/trek_layers.csv`. A* / Dijkstra over the grid with a cost model per mobility profile
@@ -57,7 +57,7 @@ npm --prefix frontend run dev      # http://localhost:5173
 npm --prefix frontend run build    # tsc + vite build
 npm --prefix frontend run lint
 
-# backend (needs JDK 21 + Maven, or Docker)
+# backend (needs JDK 25 + Maven, or Docker)
 docker build -t nasaspace-backend backend && docker run --rm -p 9090:9090 nasaspace-backend
 ```
 

@@ -6,7 +6,7 @@ Implement exactly these endpoints, without additional fields.
 
 ## Recommended stack
 
-- Java 21, Spring Boot 3 (spring-boot-starter-web, validation)
+- Java 25, Spring Boot 4 (Spring MVC and validation)
 - springdoc-openapi (`springdoc-openapi-starter-webmvc-ui`): Swagger UI at `/swagger-ui.html`,
   OpenAPI JSON at `/v3/api-docs`. The frontend can generate types from it via `openapi-typescript`.
 - Maven or Gradle, JUnit 5 for tests.

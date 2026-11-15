@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 /** The first-person view is not built yet; flip this on when src/fpv/ is done. */
-const FPV_READY = false
+const FPV_READY = true
 
 import { ArrowUpDown, ChevronRight, Crosshair, Footprints, Navigation, RotateCcw, Truck, X } from 'lucide-react'
 import type { LonLat, RiskLevel, RoutePlan, TravelMode } from '../api/types'
