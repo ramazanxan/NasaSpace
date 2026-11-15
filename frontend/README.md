@@ -1,4 +1,4 @@
-# NasaSpace — frontend
+# MarsNavigator — frontend
 
 Route planning for rovers and astronauts across the 3D terrain of Mars.
 

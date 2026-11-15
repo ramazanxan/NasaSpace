@@ -1,4 +1,4 @@
-# NasaSpace
+# MarsNavigator
 
 Route planning for rovers and astronauts across real Martian terrain, in 3D.
 

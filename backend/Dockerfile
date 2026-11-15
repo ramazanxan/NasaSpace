@@ -11,4 +11,4 @@ COPY --from=build /workspace/target/NasaProject-0.0.1-SNAPSHOT.jar app.jar
 COPY --from=build /workspace/data ./data
 EXPOSE 9090
 USER 10001
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-Djava.awt.headless=true", "-XX:MaxRAMPercentage=75", "-jar", "/app/app.jar"]
