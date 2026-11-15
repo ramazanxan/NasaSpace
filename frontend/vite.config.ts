@@ -14,7 +14,11 @@ export default defineConfig(({ mode }) => {
     server: {
       // One public link for demos: the dev server forwards API calls to the Java backend,
       // and accepts requests coming through a Cloudflare quick tunnel.
-      proxy: { '/api': 'http://localhost:9090' },
+      proxy: { '/api': { target: 'http://localhost:9090', changeOrigin: true } },
+      allowedHosts: ['.trycloudflare.com'],
+    },
+    preview: {
+      proxy: { '/api': { target: 'http://localhost:9090', changeOrigin: true } },
       allowedHosts: ['.trycloudflare.com'],
     },
   plugins: [
