@@ -4,6 +4,7 @@ const FPV_READY = true
 
 import { ArrowUpDown, ChevronRight, Crosshair, Footprints, Navigation, RotateCcw, Truck, X } from 'lucide-react'
 import type { LonLat, RiskLevel, RoutePlan, TravelMode } from '../api/types'
+import { api } from '../api/client'
 import { formatCoord } from '../map/geo'
 import { useApp, useProfile } from '../store/useApp'
 import { Button, IconButton, Notice, Segmented, Stat } from '../ui/primitives'
@@ -252,6 +253,7 @@ export function RoutePanel() {
           {plan && status !== 'error' && plan.status === 'NO_ROUTE' && (
             <div className="route-error" data-stale={loading || undefined}>
               <Notice>{noRouteMessage(plan, profile)}</Notice>
+              {(plan.reason === 'START_BLOCKED' || plan.reason === 'GOAL_BLOCKED') && <MoveToOpenGround which={plan.reason === 'START_BLOCKED' ? 'from' : 'to'} />}
             </div>
           )}
           {plan && status !== 'error' && plan.status === 'OK' && (
@@ -278,5 +280,35 @@ export function RoutePanel() {
         </>
       )}
     </section>
+  )
+}
+
+/** Moves a blocked route point to the nearest cell the current mode may enter. */
+function MoveToOpenGround({ which }: { which: 'from' | 'to' }) {
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const move = async () => {
+    const s = useApp.getState()
+    const point = s[which]
+    if (!point) return
+    setBusy(true)
+    setNote(null)
+    try {
+      const cell = await api.nearestOpen(point, s.mode, s.hour)
+      s.setPoint(which, cell.center)
+      setNote(`Moved ${Math.round(cell.distanceFromPointM / 1000).toLocaleString('en-US')} km to open ground`)
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Could not find open ground nearby')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="route-move">
+      <Button variant="secondary" onClick={move} disabled={busy}>
+        {busy ? 'Looking for open ground' : `Move ${which === 'from' ? 'A' : 'B'} to nearest open ground`}
+      </Button>
+      {note && <span className="muted">{note}</span>}
+    </div>
   )
 }

@@ -48,6 +48,14 @@ public class RouteController {
     }
 
     /** Analysis layer catalog with legend stops. */
+    @GetMapping("/cells/nearest-open")
+    public Map<String, Object> nearestOpen(@RequestParam(required = false) Double lon,
+                                           @RequestParam(required = false) Double lat,
+                                           @RequestParam(required = false) String mode,
+                                           @RequestParam(required = false) Double hour) {
+        return service.nearestOpen(lon, lat, mode, hour);
+    }
+
     @GetMapping("/layers")
     public LayerService.Catalog layers() {
         return layers.catalog();

@@ -163,6 +163,50 @@ public class RoutingService {
         return out;
     }
 
+    // ---------- GET /cells/nearest-open ----------
+
+    /**
+     * Nearest cell the given profile may enter at this hour, found by a breadth-first walk over
+     * hex neighbours from the cell under the point. Used to move a blocked route point onto open ground.
+     */
+    public Map<String, Object> nearestOpen(Double lon, Double lat, String mode, Double hourParam) {
+        requireReady();
+        if (lon == null || lat == null)
+            throw new ApiException(HttpStatus.BAD_REQUEST, "MISSING_POINT", "Pass both lon and lat as query parameters.");
+        MobilityProfile profile = parseMode(mode == null ? "rover" : mode);
+        double hour = parseHour(hourParam);
+        double[] p = normalise(lon, lat, "point");
+        int start = HexAStar.nearestCell(p[0], p[1]);
+        if (start < 0)
+            throw new ApiException(HttpStatus.BAD_REQUEST, "POINT_OUTSIDE_GRID",
+                    "This point is outside the modelled area (lon -180 to 0). Pick a point in the western hemisphere.");
+        CostModel m = new CostModel(profile, hour);
+        int found = -1;
+        int[] dist = new int[HexAStar.n];
+        java.util.Arrays.fill(dist, -1);
+        java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+        queue.add(start);
+        dist[start] = 0;
+        while (!queue.isEmpty()) {
+            int u = queue.poll();
+            if (m.blockedBy(u) == null) { found = u; break; }
+            if (dist[u] >= 40) continue; // about 2,400 km: beyond that the area is simply closed
+            for (int v : HexAStar.neigh[u]) {
+                if (dist[v] >= 0) continue;
+                dist[v] = dist[u] + 1;
+                queue.add(v);
+            }
+        }
+        if (found < 0)
+            throw new ApiException(HttpStatus.NOT_FOUND, "CELL_NOT_FOUND",
+                    "No open ground for the " + profile.label.toLowerCase(Locale.ROOT) + " within 2,400 km of this point.");
+        Map<String, Object> out = cellAt(HexAStar.ocx[found], HexAStar.ocy[found], hour);
+        out.put("mode", profile.id);
+        out.put("distanceFromPointM", Math.round(HexAStar.haversine(p[0], p[1], HexAStar.ocx[found], HexAStar.ocy[found])));
+        out.put("cellsAway", dist[found]);
+        return out;
+    }
+
     // ---------- Validation ----------
 
     private void requireReady() {

@@ -101,6 +101,10 @@ export const api = {
   cellAt: (p: LonLat, hour: number, signal?: AbortSignal): Promise<CellInfo> =>
     http(`/cells/at?${q({ lon: p.lon, lat: p.lat, hour })}`, { signal }),
 
+  /** Nearest cell this mode may enter at this hour, for moving a blocked route point. */
+  nearestOpen: (p: LonLat, mode: TravelMode, hour: number): Promise<CellInfo & { distanceFromPointM: number }> =>
+    http(`/cells/nearest-open?${q({ lon: p.lon, lat: p.lat, mode, hour })}`),
+
   layers: (signal?: AbortSignal): Promise<LayerCatalog> => http('/layers', { signal }),
 
   /** URL of a rendered analysis layer; hour is rounded to half hours so images cache well. */
