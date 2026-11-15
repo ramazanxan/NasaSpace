@@ -103,15 +103,24 @@ function Walk({ start }: { start: LonLat }) {
 
   // Keyboard.
   useEffect(() => {
+    // Physical keys (e.code), so W/A/S/D work in any keyboard layout, Russian included.
+    const CODES: Record<string, string> = {
+      KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', KeyQ: 'q', KeyE: 'e',
+      ArrowUp: 'arrowup', ArrowDown: 'arrowdown', ArrowLeft: 'arrowleft', ArrowRight: 'arrowright',
+      ShiftLeft: 'shift', ShiftRight: 'shift',
+    }
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') return setWalk(false)
-      const k = e.key.toLowerCase()
-      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift', 'q', 'e'].includes(k)) {
+      if (e.code === 'Escape' || e.key === 'Escape') return setWalk(false)
+      const k = CODES[e.code]
+      if (k) {
         keys.current.add(k)
         e.preventDefault()
       }
     }
-    const up = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase())
+    const up = (e: KeyboardEvent) => {
+      const k = CODES[e.code]
+      if (k) keys.current.delete(k)
+    }
     const blur = () => keys.current.clear()
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
