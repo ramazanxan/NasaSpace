@@ -1,0 +1,84 @@
+/*
+ * NasaSpace design tokens.
+ *
+ * Direction: a field planner looking at real Martian ground. The terrain is
+ * the one rich thing on screen; the chrome is quiet graphite. The accent is
+ * the pale blue of a Martian sunset (dust scatters red light, so the sky
+ * near the setting sun turns blue) and marks only the route and the
+ * current selection.
+ */
+:root {
+  color-scheme: dark;
+
+  /* graphite ramp, slightly cool */
+  --c-ground: #15171a;
+  --c-surface: #1c1f23;
+  --c-raised: #24282d;
+  --c-overlay: #2c3137;
+  --c-line: rgba(236, 232, 225, 0.08);
+  --c-line-strong: rgba(236, 232, 225, 0.16);
+
+  /* text: warm off-white, like dust in low sun */
+  --c-text: #ece8e1;
+  --c-text-2: #a9a8a4;
+  --c-text-3: #74767a;
+
+  /* accent: Martian sunset blue */
+  --c-accent: #8db8d9;
+  --c-accent-ink: #10202c;
+  --c-accent-soft: rgba(141, 184, 217, 0.14);
+
+  /* terrain world, used in data only (layers, profile fill, markers) */
+  --c-rust: #b8613a;
+  --c-ochre: #d4a15a;
+  --c-basalt: #4a4440;
+
+  /* semantic */
+  --c-ok: #8fb894;
+  --c-warn: #d4a15a;
+  --c-danger: #d9705f;
+  --c-danger-soft: rgba(217, 112, 95, 0.1);
+  --c-danger-line: rgba(217, 112, 95, 0.25);
+  --c-danger-text: #f0b1a6;
+
+  /* type */
+  --font-ui: 'Geologica', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-20: 20px;
+  --fs-28: 28px;
+  --lh-tight: 1.2;
+  --lh-body: 1.45;
+
+  /* space: 4px grid */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+
+  /* radius: control 8, inner card 10, panel 14 (= 10 + 4 padding gap) */
+  --r-control: 8px;
+  --r-card: 10px;
+  --r-panel: 14px;
+
+  /* motion */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --t-fast: 120ms;
+  --t-enter: 220ms;
+
+  --panel-w: 320px;
+  --panel-w-right: 340px;
+  --dock-h: 72px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 0ms;
+    --t-enter: 0ms;
+  }
+}

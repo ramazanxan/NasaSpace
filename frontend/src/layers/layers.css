@@ -1,0 +1,209 @@
+/* Stretches to the height of TerrainControls when it sits beside it in .map-tools. */
+.layers-control {
+  position: relative;
+  display: flex;
+  align-self: stretch;
+}
+
+.layers-control__button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  color: var(--c-text-2);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.layers-control__button:hover,
+.layers-control__button[aria-expanded='true'] {
+  background: var(--c-raised);
+  color: var(--c-text);
+}
+
+/*
+ * Scrolls inside when taller than the map: LayersControl sets --pop-max so it
+ * ends 16px above the bottom of the map; the fallback covers the first frame.
+ */
+.layers-pop {
+  position: absolute;
+  top: calc(100% + var(--s-2));
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  width: min(320px, calc(100vw - 2 * var(--s-4)));
+  max-height: var(--pop-max, 60vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-overlay) transparent;
+  padding: var(--s-3) var(--s-4) var(--s-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-card);
+}
+
+.layers-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.layers-section + .layers-section {
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--c-line);
+}
+
+.layers-section__title {
+  margin: 0 0 var(--s-1);
+  padding: 0;
+  font-size: var(--fs-13);
+  font-weight: 500;
+  color: var(--c-text-2);
+}
+
+.layer-text {
+  margin: 0;
+  font-size: var(--fs-12);
+  line-height: var(--lh-body);
+  color: var(--c-text-2);
+}
+
+.layer-text--quiet {
+  color: var(--c-text-3);
+}
+
+.layer-item {
+  display: flex;
+  flex-direction: column;
+}
+
+/* indented to the toggle / radio label: 28px control + 12px gap */
+.layer-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: 0 0 var(--s-2) calc(28px + var(--s-3));
+}
+
+/* ---------- radio list (one analysis layer at a time) ---------- */
+
+.layer-radio {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: start;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  cursor: pointer;
+}
+
+.layer-radio input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.layer-radio__dot {
+  position: relative;
+  justify-self: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--c-text-3);
+  transition: box-shadow var(--t-fast) var(--ease);
+}
+
+.layer-radio:hover .layer-radio__dot {
+  box-shadow: inset 0 0 0 1.5px var(--c-text-2);
+}
+
+.layer-radio input:checked + .layer-radio__dot {
+  box-shadow: inset 0 0 0 1.5px var(--c-accent);
+}
+
+.layer-radio input:checked + .layer-radio__dot::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--c-accent);
+}
+
+.layer-radio input:focus-visible + .layer-radio__dot {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+.layer-radio__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.layer-radio__title {
+  font-size: var(--fs-14);
+  line-height: var(--lh-tight);
+  color: var(--c-text);
+}
+
+.layer-radio__description {
+  font-size: var(--fs-12);
+  line-height: var(--lh-body);
+  color: var(--c-text-3);
+}
+
+/* ---------- legend: a data ramp, the only gradient in the chrome ---------- */
+
+.layer-legend {
+  margin: 0;
+}
+
+.layer-legend__bar {
+  height: 8px;
+  border-radius: 2px;
+  background-color: var(--c-raised);
+  box-shadow: inset 0 0 0 1px var(--c-line);
+}
+
+/* one equal column per stop; the bar's colour stops sit at the column centres */
+.layer-legend__ticks {
+  display: grid;
+  margin-top: var(--s-1);
+  font-size: var(--fs-12);
+  line-height: var(--lh-tight);
+}
+
+.layer-legend__tick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+
+.layer-legend__value {
+  color: var(--c-text-2);
+  white-space: nowrap;
+}
+
+.layer-legend__label {
+  color: var(--c-text-3);
+  overflow-wrap: anywhere;
+}
+
+.layer-legend__unit {
+  margin-top: var(--s-1);
+  font-size: var(--fs-12);
+  color: var(--c-text-3);
+}

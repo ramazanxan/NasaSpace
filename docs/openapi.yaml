@@ -1,0 +1,713 @@
+openapi: 3.1.0
+info:
+  title: NasaSpace API
+  version: 1.0.0
+  description: |
+    Contract between the NasaSpace frontend (Vite + React + TypeScript) and the Java backend.
+    Source of truth on the frontend side: `frontend/src/api/types.ts` (types) and
+    `frontend/src/api/client.ts` (paths, methods, parameters, error handling).
+    Reference behavior: `frontend/src/api/mock/*.ts`.
+
+    Conventions
+    - Coordinates: planetocentric degrees on the Mars ellipsoid,
+      longitude is positive east, range [-180, 180].
+    - Heights: meters relative to the MOLA areoid (Mars "sea level").
+    - Distances: meters. Slopes: degrees. Durations: Martian days (sols).
+    - Grids (terrain and layers): row-major, origin at the north-west corner,
+      array length equals width * height, index = row * width + col.
+    - Every non-2xx response carries a JSON body ApiErrorBody {code, message};
+      message is shown to the user as is, so it is in English and includes a hint about what to do next.
+    - There is no database: grids and points are kept in backend memory.
+servers:
+  - url: http://localhost:8080
+    description: Local backend (the frontend substitutes its own address via VITE_API_URL)
+tags:
+  - name: regions
+  - name: terrain
+  - name: places
+  - name: route
+  - name: trails
+  - name: sun
+paths:
+  /regions:
+    get:
+      tags: [regions]
+      operationId: getRegions
+      summary: List of modeled regions
+      description: All regions (5-6 of them) that have terrain. The rest of Mars is only a backdrop on the frontend.
+      responses:
+        '200':
+          description: List of regions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Region'
+              example:
+                - id: jezero
+                  name: Jezero Crater
+                  summary: Ancient lake with a river delta, the Perseverance landing site
+                  bbox: [76.9, 17.9, 78.1, 18.9]
+                  center: { lon: 77.5, lat: 18.4 }
+                  baseHeight: -2600
+                - id: gale
+                  name: Gale Crater
+                  summary: Crater with Mount Sharp at its center, where Curiosity operates
+                  bbox: [136.9, -5.9, 138.3, -4.3]
+                  center: { lon: 137.55, lat: -5.0 }
+                  baseHeight: -4500
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /terrain/{regionId}:
+    get:
+      tags: [terrain]
+      operationId: getTerrain
+      summary: Region height grid
+      description: |
+        Regular height grid covering the region bbox. Row-major, from the north-west corner.
+        The mocks serve 257 x 257 (66,049 values); the backend may serve a different size,
+        the frontend reads width and height from the response. The response is large, gzip is recommended.
+        The heights array is abbreviated in the example.
+      parameters:
+        - $ref: '#/components/parameters/RegionId'
+      responses:
+        '200':
+          description: Height grid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerrainGrid'
+              example:
+                regionId: jezero
+                bbox: [76.9, 17.9, 78.1, 18.9]
+                width: 257
+                height: 257
+                resolution: 263.2
+                heights: [-2210, -2214, -2219, -2223]
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /layers/{regionId}/{kind}:
+    get:
+      tags: [terrain]
+      operationId: getLayer
+      summary: Slope or hazard layer
+      description: |
+        Same grid layout as TerrainGrid (same bbox, width, height).
+        slope is in degrees, hazard is in the range 0..1. The values array is abbreviated in the example.
+      parameters:
+        - $ref: '#/components/parameters/RegionId'
+        - name: kind
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/LayerKind'
+      responses:
+        '200':
+          description: Layer value grid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LayerGrid'
+              example:
+                regionId: jezero
+                kind: slope
+                bbox: [76.9, 17.9, 78.1, 18.9]
+                width: 257
+                height: 257
+                values: [2.4, 3.1, 1.8, 0.9]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /places:
+    get:
+      tags: [places]
+      operationId: searchPlaces
+      summary: Search places by name
+      description: |
+        Case-insensitive substring search over name and description.
+        An empty q returns the first limit places. The frontend always sends limit=8.
+        If nothing is found: an empty array and 200, not 404.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search string, may be empty.
+          schema:
+            type: string
+            maxLength: 100
+          example: Perseverance
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of results.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 8
+      responses:
+        '200':
+          description: Matching places
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Place'
+              example:
+                - id: octavia-butler
+                  name: Perseverance landing site
+                  kind: landing-site
+                  regionId: jezero
+                  position: { lon: 77.4508, lat: 18.4447 }
+                  height: -2613
+                  slope: 1.8
+                  description: The Octavia E. Butler landing site, where Perseverance landed on February 18, 2021.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /route:
+    post:
+      tags: [route]
+      operationId: buildRoute
+      summary: Build a route
+      description: |
+        Builds a route between two points inside a region. Modes and limits (reference: mock/router.ts):
+        rover up to 20 degrees of slope and 150 m per sol; astronaut up to 30 degrees and 6000 m per sol.
+        stats.sols = length / meters per sol, rounded to 0.1.
+        The first and last route points match from and to from the request.
+        If A and B fall into the same grid node, the response is 400 BAD_REQUEST
+        "Points A and B are too close: move one of them".
+        Rate limit: about 10 per second per IP, otherwise 429.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteRequest'
+            example:
+              regionId: jezero
+              from: { lon: 77.4508, lat: 18.4447 }
+              to: { lon: 77.38, lat: 18.5 }
+              mode: rover
+      responses:
+        '200':
+          description: Route
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Route'
+              example:
+                regionId: jezero
+                mode: rover
+                points:
+                  - { lon: 77.4508, lat: 18.4447, height: -2613, distance: 0, slope: 1.8 }
+                  - { lon: 77.4414, lat: 18.4492, height: -2609, distance: 1180, slope: 3.2 }
+                  - { lon: 77.38, lat: 18.5, height: -2541, distance: 9460, slope: 4.7 }
+                stats:
+                  length: 9460
+                  ascent: 112
+                  descent: 44
+                  maxSlope: 11.3
+                  sols: 63.1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/RouteUnprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /route/debug:
+    post:
+      tags: [route]
+      operationId: buildRouteDebug
+      summary: Route with search internals (A* vs Dijkstra)
+      description: |
+        The same request as /route, plus the cell expansion order for a visual comparison of the algorithms.
+        Difference from /route: if no path is found, the response is 200 with route: null
+        (not 422 UNREACHABLE). The OUT_OF_REGION and UNREACHABLE errors for a start or end
+        point that is too steep are returned as 422, as in /route; coinciding A and B nodes give 400.
+        Rate limit: about 1 per second per IP, otherwise 429.
+      parameters:
+        - name: algorithm
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [astar, dijkstra]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteRequest'
+            example:
+              regionId: jezero
+              from: { lon: 77.4508, lat: 18.4447 }
+              to: { lon: 77.38, lat: 18.5 }
+              mode: rover
+      responses:
+        '200':
+          description: Route and visited cells
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteDebug'
+              example:
+                algorithm: astar
+                visited:
+                  - [77.4508, 18.4447]
+                  - [77.4555, 18.4447]
+                  - [77.4508, 18.4494]
+                route: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/RouteUnprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /trails:
+    get:
+      tags: [trails]
+      operationId: getTrails
+      summary: Region trails (road graph edges)
+      description: |
+        Polylines of the existing trails in the region. In the mocks these are three astronaut-mode routes
+        between fixed points of the region; the backend is free to serve its own graph.
+        If there are no trails, an empty array is returned.
+      parameters:
+        - name: regionId
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z0-9-]{1,32}$'
+          example: jezero
+      responses:
+        '200':
+          description: Trails
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Trail'
+              example:
+                - id: jezero-t0
+                  regionId: jezero
+                  name: Trail 1
+                  points:
+                    - { lon: 77.08, lat: 18.4 }
+                    - { lon: 77.5, lat: 18.41 }
+                    - { lon: 77.92, lat: 18.4 }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/Internal'
+  /sun:
+    get:
+      tags: [sun]
+      operationId: getSun
+      summary: Sun position at a point
+      description: |
+        Sun position for a point, a sol and local mean solar time (LMST).
+        Reference math: sunState in frontend/src/api/mock/index.ts.
+      parameters:
+        - name: lon
+          in: query
+          required: true
+          description: Longitude, degrees, east is positive.
+          schema:
+            type: number
+            minimum: -180
+            maximum: 180
+          example: 77.45
+        - name: lat
+          in: query
+          required: true
+          description: Latitude, degrees.
+          schema:
+            type: number
+            minimum: -90
+            maximum: 90
+          example: 18.44
+        - name: sol
+          in: query
+          required: true
+          description: Sol number (a number; the frontend passes it as is).
+          schema:
+            type: number
+            minimum: 0
+            maximum: 100000
+          example: 120
+        - name: hour
+          in: query
+          required: true
+          description: Local mean solar time, hours 0..24. Returned as lmst.
+          schema:
+            type: number
+            minimum: 0
+            maximum: 24
+          example: 14.5
+      responses:
+        '200':
+          description: Sun state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SunState'
+              example:
+                sol: 120
+                lmst: 14.5
+                elevation: 38.2
+                azimuth: 262.4
+                hoursToSunset: 3.4
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/Internal'
+components:
+  parameters:
+    RegionId:
+      name: regionId
+      in: path
+      required: true
+      description: Region identifier from GET /regions (jezero, gale, olympus, melas, utopia, elysium).
+      schema:
+        type: string
+        pattern: '^[a-z0-9-]{1,32}$'
+      example: jezero
+  responses:
+    BadRequest:
+      description: Invalid request parameters or body.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorBody'
+          example:
+            code: BAD_REQUEST
+            message: 'Invalid mode. Allowed: rover or astronaut'
+    TooManyRequests:
+      description: Request limit from a single IP exceeded. The frontend shows message as is.
+      headers:
+        Retry-After:
+          description: How many seconds to wait before retrying.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorBody'
+          example:
+            code: TOO_MANY_REQUESTS
+            message: Too many requests. Wait a second and try again
+    NotFound:
+      description: Region (or other resource) not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorBody'
+          example:
+            code: NOT_FOUND
+            message: Region atlantis not found
+    RouteUnprocessable:
+      description: |
+        The request is valid, but the route cannot be built.
+        OUT_OF_REGION: a point is outside the region bbox. UNREACHABLE: the start or end point
+        is steeper than the mode limit, or steep slopes block every path.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorBody'
+          examples:
+            outOfRegion:
+              summary: Point outside the region
+              value:
+                code: OUT_OF_REGION
+                message: 'Point is outside the region: pick a spot inside it'
+            unreachable:
+              summary: Target unreachable
+              value:
+                code: UNREACHABLE
+                message: 'Target unreachable: steep slopes block every path'
+    Internal:
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorBody'
+          example:
+            code: INTERNAL
+            message: Internal server error. Try again
+  schemas:
+    LonLat:
+      type: object
+      description: A point in planetocentric degrees.
+      required: [lon, lat]
+      properties:
+        lon:
+          type: number
+          minimum: -180
+          maximum: 180
+          description: Longitude, degrees, east is positive, [-180, 180].
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+          description: Latitude, degrees, [-90, 90].
+    BBox:
+      type: array
+      description: 'Bounds [west, south, east, north] in degrees.'
+      minItems: 4
+      maxItems: 4
+      items:
+        type: number
+    Region:
+      type: object
+      description: One of the modeled regions.
+      required: [id, name, summary, bbox, center, baseHeight]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        summary:
+          type: string
+          description: One-line description for the region list.
+        bbox:
+          $ref: '#/components/schemas/BBox'
+        center:
+          $ref: '#/components/schemas/LonLat'
+        baseHeight:
+          type: number
+          description: Typical height of the region floor, meters from the MOLA areoid.
+    TerrainGrid:
+      type: object
+      description: Regular height grid, row-major from the north-west corner.
+      required: [regionId, bbox, width, height, heights, resolution]
+      properties:
+        regionId:
+          type: string
+        bbox:
+          $ref: '#/components/schemas/BBox'
+        width:
+          type: integer
+          description: Number of columns (along longitude, west to east).
+        height:
+          type: integer
+          description: Number of rows (along latitude, north to south).
+        heights:
+          type: array
+          description: Heights, meters from the MOLA areoid. Length equals width * height, index = row * width + col.
+          items:
+            type: number
+        resolution:
+          type: number
+          description: Ground distance between adjacent samples, meters.
+    LayerKind:
+      type: string
+      enum: [slope, hazard]
+    LayerGrid:
+      type: object
+      description: Layer grid, same layout as TerrainGrid.
+      required: [regionId, kind, bbox, width, height, values]
+      properties:
+        regionId:
+          type: string
+        kind:
+          $ref: '#/components/schemas/LayerKind'
+        bbox:
+          $ref: '#/components/schemas/BBox'
+        width:
+          type: integer
+        height:
+          type: integer
+        values:
+          type: array
+          description: For slope degrees, for hazard 0..1. Length equals width * height.
+          items:
+            type: number
+    PlaceKind:
+      type: string
+      enum: [landing-site, crater, mountain, canyon, plain, feature]
+    Place:
+      type: object
+      required: [id, name, kind, regionId, position, height, slope, description]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        kind:
+          $ref: '#/components/schemas/PlaceKind'
+        regionId:
+          type: string
+        position:
+          $ref: '#/components/schemas/LonLat'
+        height:
+          type: number
+          description: Height at the point, meters from the MOLA areoid.
+        slope:
+          type: number
+          description: Slope at the point, degrees.
+        description:
+          type: string
+    TravelMode:
+      type: string
+      enum: [rover, astronaut]
+      description: 'rover: up to 20 degrees, 150 m per sol. astronaut: up to 30 degrees, 6000 m per sol.'
+    RouteRequest:
+      type: object
+      required: [regionId, from, to, mode]
+      properties:
+        regionId:
+          type: string
+          pattern: '^[a-z0-9-]{1,32}$'
+        from:
+          $ref: '#/components/schemas/LonLat'
+        to:
+          $ref: '#/components/schemas/LonLat'
+        mode:
+          $ref: '#/components/schemas/TravelMode'
+    RoutePoint:
+      description: Route point (LonLat plus height, distance and slope).
+      allOf:
+        - $ref: '#/components/schemas/LonLat'
+        - type: object
+          required: [height, distance, slope]
+          properties:
+            height:
+              type: number
+              description: Height, meters from the MOLA areoid.
+            distance:
+              type: number
+              description: Distance from the route start along it, meters. 0 for the first point.
+            slope:
+              type: number
+              description: Slope at the point, degrees.
+    RouteStats:
+      type: object
+      required: [length, ascent, descent, maxSlope, sols]
+      properties:
+        length:
+          type: number
+          description: Route length, meters.
+        ascent:
+          type: number
+          description: Total ascent, meters.
+        descent:
+          type: number
+          description: Total descent, meters (a positive number).
+        maxSlope:
+          type: number
+          description: Maximum slope along the route, degrees.
+        sols:
+          type: number
+          description: Duration in sols (length / meters per sol of the mode).
+    Route:
+      type: object
+      required: [regionId, mode, points, stats]
+      properties:
+        regionId:
+          type: string
+        mode:
+          $ref: '#/components/schemas/TravelMode'
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoutePoint'
+        stats:
+          $ref: '#/components/schemas/RouteStats'
+    RouteDebug:
+      type: object
+      required: [algorithm, visited, route]
+      properties:
+        algorithm:
+          type: string
+          enum: [astar, dijkstra]
+        visited:
+          type: array
+          maxItems: 100000
+          description: Grid cells in expansion order, [lon, lat] pairs.
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: number
+        route:
+          description: Route, or null if no path is found.
+          oneOf:
+            - $ref: '#/components/schemas/Route'
+            - type: 'null'
+    Trail:
+      type: object
+      required: [id, regionId, name, points]
+      properties:
+        id:
+          type: string
+        regionId:
+          type: string
+        name:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/LonLat'
+    SunState:
+      type: object
+      required: [sol, lmst, elevation, azimuth, hoursToSunset]
+      properties:
+        sol:
+          type: number
+        lmst:
+          type: number
+          description: Local mean solar time, hours 0..24.
+        elevation:
+          type: number
+          description: Degrees above the horizon, negative at night.
+        azimuth:
+          type: number
+          description: Degrees clockwise from north.
+        hoursToSunset:
+          type: [number, 'null']
+          description: Hours until sunset, null when the Sun is below the horizon.
+    ApiErrorCode:
+      type: string
+      enum: [OUT_OF_REGION, UNREACHABLE, BAD_REQUEST, NOT_FOUND, INTERNAL, TOO_MANY_REQUESTS]
+    ApiErrorBody:
+      type: object
+      description: Body of any non-2xx response.
+      required: [code, message]
+      properties:
+        code:
+          $ref: '#/components/schemas/ApiErrorCode'
+        message:
+          type: string
+          description: User-facing text, in English, with a hint about what to do next.

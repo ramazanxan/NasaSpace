@@ -1,0 +1,277 @@
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--c-ground);
+  color: var(--c-text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-14);
+  line-height: var(--lh-body);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+/* ---------- shell ---------- */
+
+.app {
+  position: relative;
+  height: 100%;
+}
+
+.mars-viewer {
+  position: absolute;
+  inset: 0;
+}
+
+/* Cesium chrome we keep: credits, quietly. */
+.mars-viewer .cesium-widget-credits {
+  font-size: 11px;
+  opacity: 0.55;
+  left: calc(var(--panel-w) + var(--s-8)) !important;
+  bottom: var(--s-2) !important;
+}
+
+.panel {
+  position: absolute;
+  top: var(--s-4);
+  bottom: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-panel);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-overlay) transparent;
+}
+
+.panel--left {
+  left: var(--s-4);
+  width: var(--panel-w);
+}
+
+.panel--right {
+  right: var(--s-4);
+  width: var(--panel-w-right);
+}
+
+.panel--right:empty {
+  display: none;
+}
+
+.map-tools {
+  position: absolute;
+  top: var(--s-4);
+  right: calc(var(--panel-w-right) + var(--s-8));
+  left: calc(var(--panel-w) + var(--s-8));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  align-items: stretch;
+  pointer-events: none;
+}
+
+.map-tools > * {
+  pointer-events: auto;
+}
+
+.dock {
+  position: absolute;
+  left: calc(var(--panel-w) + var(--s-8));
+  right: calc(var(--panel-w-right) + var(--s-8));
+  bottom: var(--s-8);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.dock > * {
+  pointer-events: auto;
+}
+
+/* ---------- brand ---------- */
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 32px;
+}
+
+.brand__mark {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.brand__name {
+  font-size: var(--fs-16);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brand__mode {
+  margin-left: auto;
+  font-size: var(--fs-12);
+  color: var(--c-text-3);
+}
+
+/* ---------- shared bits ---------- */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.section__title {
+  margin: 0;
+  font-size: var(--fs-13);
+  font-weight: 500;
+  color: var(--c-text-2);
+}
+
+.muted {
+  color: var(--c-text-3);
+}
+
+.float {
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-card);
+  padding: var(--s-2) var(--s-3);
+}
+
+/* ---------- small screens: panels stack over the map ---------- */
+
+@media (max-width: 900px) {
+  body {
+    overflow: auto;
+  }
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100%;
+  }
+  .mars-viewer {
+    position: relative;
+    height: 62vh;
+    order: 0;
+  }
+  .panel {
+    position: static;
+    width: auto !important;
+    margin: var(--s-3) var(--s-4) 0;
+    overflow: visible;
+  }
+  .panel--left {
+    order: 1;
+  }
+  .panel--right {
+    order: 2;
+  }
+  .map-tools {
+    top: var(--s-3);
+    right: var(--s-4);
+  }
+  .dock {
+    position: static;
+    order: 3;
+    margin: var(--s-3) var(--s-4) var(--s-6);
+  }
+  .mars-viewer .cesium-widget-credits {
+    left: var(--s-2) !important;
+  }
+}
+
+.terrain-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 200px;
+}
+
+.basemap-switch {
+  width: 220px;
+}
+
+.basemap-switch .segmented {
+  background: var(--c-surface);
+  height: 100%;
+}
+
+.brand__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-text-3);
+}
+
+.brand__mode--online .brand__dot {
+  background: var(--c-ok);
+}
+
+.brand__mode--offline .brand__dot {
+  background: var(--c-warn);
+}
+
+.terrain-controls .slider {
+  flex: 1;
+}
+
+/* We use no Cesium ion services, so only the data attribution stays. */
+.mars-viewer .cesium-credit-logoContainer {
+  display: none !important;
+}
+
+.crash {
+  display: grid;
+  place-content: center;
+  justify-items: start;
+  gap: var(--s-3);
+  height: 100%;
+  padding: var(--s-6);
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.crash__title {
+  margin: 0;
+  font-size: var(--fs-20);
+  font-weight: 500;
+}

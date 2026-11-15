@@ -1,10 +1,10 @@
 ---
-name: Задача
-about: Новая задача или баг
+name: Task
+about: A new task or bug
 ---
 
-## Описание
+## Description
 
 
-## Критерии готовности
+## Done when
 - [ ]

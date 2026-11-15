@@ -1,0 +1,226 @@
+/* ---------- search box ---------- */
+
+.search {
+  position: relative;
+}
+
+.search__field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 36px;
+  background: var(--c-ground);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  transition: border-color var(--t-fast) var(--ease);
+}
+
+.search__field:hover {
+  border-color: var(--c-line-strong);
+}
+
+.search__field:focus-within {
+  border-color: var(--c-line-strong);
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
+
+.search__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  flex: none;
+  color: var(--c-text-3);
+}
+
+.search__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--s-2) 0 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--fs-14);
+}
+
+.search__input:focus-visible {
+  outline: none;
+}
+
+.search__input::placeholder {
+  color: var(--c-text-3);
+}
+
+.search__clear {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-right: var(--s-1);
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--c-text-3);
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.search__clear:hover {
+  background: var(--c-raised);
+  color: var(--c-text);
+}
+
+/* ---------- suggestions ---------- */
+
+.search__popover {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + var(--s-1));
+  left: 0;
+  right: 0;
+  padding: var(--s-1);
+  background: var(--c-raised);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-card);
+  animation: search-in var(--t-fast) var(--ease);
+}
+
+.search__popover[hidden] {
+  display: none;
+}
+
+@keyframes search-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search__popover {
+    animation: none;
+  }
+}
+
+.search__list {
+  max-height: 320px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-overlay) transparent;
+}
+
+.search__list:empty {
+  display: none;
+}
+
+.search__option {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    'name'
+    'meta';
+  align-items: center;
+  column-gap: var(--s-3);
+  min-height: 48px;
+  padding: var(--s-1) var(--s-2);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.search__option[aria-selected='true'] {
+  background: var(--c-overlay);
+  box-shadow: inset 0 0 0 1px var(--c-line-strong);
+}
+
+.search__name {
+  grid-area: name;
+  overflow: hidden;
+  font-size: var(--fs-14);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.search__meta {
+  grid-area: meta;
+  overflow: hidden;
+  font-size: var(--fs-12);
+  color: var(--c-text-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.search__note {
+  margin: 0;
+  padding: var(--s-2);
+  font-size: var(--fs-13);
+  color: var(--c-text-2);
+}
+
+/* ---------- place list ---------- */
+
+.places__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 calc(var(--s-2) * -1);
+  padding: 0;
+  list-style: none;
+}
+
+.places__row {
+  display: grid;
+  grid-template-columns: 1fr 16px;
+  align-items: center;
+  column-gap: var(--s-2);
+  width: 100%;
+  height: 52px;
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease);
+}
+
+.places__row:hover {
+  background: var(--c-raised);
+}
+
+.places__row:hover .places__chev {
+  color: var(--c-text-2);
+}
+
+.places__row[aria-current='true'] {
+  background: var(--c-raised);
+  box-shadow: inset 2px 0 0 var(--c-accent);
+}
+
+.places__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.places__name {
+  font-size: var(--fs-14);
+  line-height: var(--lh-tight);
+}
+
+.places__summary {
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: var(--fs-12);
+  color: var(--c-text-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.places__chev {
+  color: var(--c-text-3);
+  transition: color var(--t-fast) var(--ease);
+}
