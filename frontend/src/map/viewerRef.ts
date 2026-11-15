@@ -36,6 +36,8 @@ export interface MapPointerEvent {
   position: LonLat | null
   /** `id` of the entity under the pointer, if any. */
   entityId: string | null
+  /** True when the user was choosing a route point at the moment of the event. */
+  picking: boolean
 }
 
 type Handler = (e: MapPointerEvent) => void

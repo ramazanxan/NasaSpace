@@ -1,47 +1,68 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { GitCompareArrows, Play, RotateCcw, X } from 'lucide-react'
 import { api } from '../api/client'
-import type { RouteRequest } from '../api/types'
+import type { RoutePlan, RouteRequest } from '../api/types'
 import { Button, IconButton, Notice } from '../ui/primitives'
 import { fmt } from '../ui/format'
-import { ALGORITHM_LABEL, useCompare, type Algorithm } from './compareStore'
-import { routeErrorMessage } from './routeUtils'
+import { ALGORITHM_LABEL, useCompare, type Algorithm, type CompareResult } from './compareStore'
+import { num, routeErrorInfo } from './routeUtils'
 
 const ALGORITHMS: Algorithm[] = ['astar', 'dijkstra']
 
-function compareNote(astar: number, dijkstra: number, la?: number | null, ld?: number | null): string {
-  const ratio = dijkstra / astar
-  const cells = ratio >= 1.05 ? `A* scanned ${fmt.deg(ratio)}× fewer cells` : 'Both scanned about the same number of cells'
+function toResult(p: RoutePlan): CompareResult {
+  const visited = Array.isArray(p.visited) ? p.visited : []
+  return {
+    visited,
+    expanded: num(p.metrics?.expandedCells) ?? visited.length,
+    length: p.status === 'OK' ? num(p.metrics?.distanceMeters) : null,
+  }
+}
+
+function compareNote(a: CompareResult, d: CompareResult): string {
+  const ratio = d.expanded / Math.max(a.expanded, 1)
+  const cells =
+    ratio >= 1.05 ? `A* expanded ${fmt.deg(ratio)}× fewer cells` : 'Both expanded about the same number of cells'
+  const la = a.length
+  const ld = d.length
   if (la == null || ld == null) return cells
   const same = Math.abs(la - ld) <= Math.max(1, ld * 0.01)
-  return same ? `${cells}, same path length` : `${cells}. Path length: ${fmt.km(la)} ${fmt.kmUnit(la)} and ${fmt.km(ld)} ${fmt.kmUnit(ld)}`
+  return same
+    ? `${cells}, same path length`
+    : `${cells}. Path length: ${fmt.km(la)} ${fmt.kmUnit(la)} and ${fmt.km(ld)} ${fmt.kmUnit(ld)}`
 }
 
 /** A* vs Dijkstra: how many grid cells each one expands to find the same route. */
 export function RouteCompare({ req }: { req: RouteRequest }) {
   const { status, error, results, playing, reset, set, play, start } = useCompare()
-  const { regionId, from, to, mode } = req
+  const { start: from, goal: to, mode, departureHour } = req
+  const ctrl = useRef<AbortController | null>(null)
 
   // Any change to the request makes old results meaningless.
-  useEffect(() => reset, [regionId, from, to, mode, reset])
+  useEffect(
+    () => () => {
+      ctrl.current?.abort()
+      reset()
+    },
+    [from, to, mode, departureHour, reset],
+  )
 
   const run = async () => {
+    ctrl.current?.abort()
+    const c = new AbortController()
+    ctrl.current = c
     const token = start()
-    const current = () => useCompare.getState().runId === token
-    const r = { regionId, from, to, mode }
+    const current = () => useCompare.getState().runId === token && !c.signal.aborted
     try {
-      const [a, d] = await Promise.all(ALGORITHMS.map((alg) => api.routeDebug(r, alg)))
+      const [a, d] = await Promise.all(
+        ALGORITHMS.map((algorithm) =>
+          api.plan({ start: from, goal: to, mode, departureHour, algorithm, includeVisited: true }, c.signal),
+        ),
+      )
       if (!current()) return // reset or rerun while in flight
-      set({
-        status: 'ready',
-        results: {
-          astar: { visited: a.visited, length: a.route?.stats.length ?? null },
-          dijkstra: { visited: d.visited, length: d.route?.stats.length ?? null },
-        },
-      })
+      set({ status: 'ready', results: { astar: toResult(a), dijkstra: toResult(d) } })
       play('astar')
     } catch (e) {
-      if (current()) set({ status: 'error', error: routeErrorMessage(e, mode) })
+      if (current()) set({ status: 'error', error: routeErrorInfo(e).message })
     }
   }
 
@@ -70,20 +91,21 @@ export function RouteCompare({ req }: { req: RouteRequest }) {
     )
   }
 
-  const astar = results.astar?.visited.length ?? 0
-  const dijkstra = results.dijkstra?.visited.length ?? 0
+  const a = results.astar
+  const d = results.dijkstra
+  const max = Math.max(a?.expanded ?? 0, d?.expanded ?? 0, 1)
   return (
     <section className="route-compare" aria-label="Algorithm comparison">
       <div className="route-compare__head">
-        <span className="section__title">Grid cells scanned</span>
+        <span className="section__title">Cells expanded</span>
         <IconButton label="Hide comparison" onClick={reset}>
           <X size={16} strokeWidth={1.5} aria-hidden />
         </IconButton>
       </div>
       <ul className="route-compare__list">
         {ALGORITHMS.map((alg) => {
-          const n = results[alg]?.visited.length ?? 0
-          const max = Math.max(astar, dijkstra, 1)
+          const r = results[alg]
+          const n = r?.expanded ?? 0
           return (
             <li key={alg} className="route-compare__row" data-active={playing === alg || undefined}>
               <span className="route-compare__name">{ALGORITHM_LABEL[alg]}</span>
@@ -92,8 +114,9 @@ export function RouteCompare({ req }: { req: RouteRequest }) {
               </span>
               <span className="route-compare__count">{fmt.int(n)}</span>
               <IconButton
-                label={`Show search: ${ALGORITHM_LABEL[alg]}`}
+                label={`Replay search: ${ALGORITHM_LABEL[alg]}`}
                 aria-pressed={playing === alg}
+                disabled={!r?.visited.length}
                 onClick={() => play(alg)}
               >
                 <Play size={16} strokeWidth={1.5} aria-hidden />
@@ -102,7 +125,7 @@ export function RouteCompare({ req }: { req: RouteRequest }) {
           )
         })}
       </ul>
-      {astar > 0 && dijkstra > 0 && <p className="route-compare__note">{compareNote(astar, dijkstra, results.astar?.length, results.dijkstra?.length)}</p>}
+      {a && d && a.expanded > 0 && d.expanded > 0 && <p className="route-compare__note">{compareNote(a, d)}</p>}
     </section>
   )
 }

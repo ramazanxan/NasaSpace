@@ -1,32 +1,37 @@
 import { useEffect, useRef } from 'react'
 import {
-  BoundingSphere,
   Cartesian2,
   Cartesian3,
+  Cartographic,
   Color,
   ConstantPositionProperty,
   Ellipsoid,
-  HeadingPitchRange,
   HeightReference,
   LabelStyle,
-  Math as CMath,
   PointPrimitiveCollection,
   PolylineDashMaterialProperty,
   VerticalOrigin,
+  sampleTerrain,
   type Entity,
   type PointPrimitive,
   type Viewer,
 } from 'cesium'
-import type { BBox, LonLat } from '../api/types'
-import { sample } from '../map/geo'
-import { displayHeight } from '../map/terrain'
+import type { LonLat, RouteCell } from '../api/types'
+import { flyToPoints } from '../map/camera'
 import { onMapClick, useViewer } from '../map/viewerRef'
 import { useApp } from '../store/useApp'
 import { useCompare } from './compareStore'
-import { POINT_LABEL, prefersReducedMotion, tokenColor } from './routeUtils'
+import { POINT_LABEL, highRiskRuns, prefersReducedMotion, tokenColor } from './routeUtils'
 
 const MARS = Ellipsoid.MARS
 const REPLAY_MS = 2600
+const MAX_REPLAY_POINTS = 40_000
+/** Terrain level the replay heights are read at: 45° tiles, ~40 km samples, close to the ~59 km hex cells. */
+const REPLAY_TERRAIN_LEVEL = 2
+/** Metres above the sampled (smoothed) ground, so points are not swallowed by finer terrain. */
+const REPLAY_LIFT = 2_500
+/** Within this camera distance replay points ignore depth, so relief never hides them up close. */
+const REPLAY_NO_DEPTH_M = 1_500_000
 
 const at = (p: LonLat, h = 0) => Cartesian3.fromDegrees(p.lon, p.lat, h, MARS)
 
@@ -35,18 +40,25 @@ function palette() {
     accent: Color.fromCssColorString(tokenColor('--c-accent', '#8db8d9')),
     accentInk: Color.fromCssColorString(tokenColor('--c-accent-ink', '#10202c')),
     ground: Color.fromCssColorString(tokenColor('--c-ground', '#15171a')),
+    rust: Color.fromCssColorString(tokenColor('--c-rust', '#b8613a')),
     text: Color.fromCssColorString(tokenColor('--c-text', '#ece8e1')),
     text3: Color.fromCssColorString(tokenColor('--c-text-3', '#74767a')),
   }
 }
 
+/** Cells of the current plan when it has a drawable route, else null. */
+const routeCells = (plan: ReturnType<typeof useApp.getState>['plan']): RouteCell[] | null => {
+  const cells = plan?.status === 'OK' ? plan.route?.cells : undefined
+  return cells && cells.length > 1 ? cells : null
+}
+
 function useClickToPick() {
   useEffect(
     () =>
-      onMapClick(({ position }) => {
-        const { pick, activeRegionId, setPoint } = useApp.getState()
-        if (!pick || !activeRegionId || !position) return
-        setPoint(pick, position)
+      onMapClick(({ position, picking }) => {
+        if (!picking || !position) return
+        const { pick, setPoint } = useApp.getState()
+        if (pick) setPoint(pick, position)
       }),
     [],
   )
@@ -54,15 +66,14 @@ function useClickToPick() {
 
 function usePickCursor(viewer: Viewer | null) {
   const pick = useApp((s) => s.pick)
-  const active = useApp((s) => s.activeRegionId)
   useEffect(() => {
-    if (!viewer || !pick || !active) return
+    if (!viewer || !pick) return
     const canvas = viewer.canvas
     canvas.style.setProperty('cursor', 'crosshair')
     return () => {
       canvas.style.removeProperty('cursor')
     }
-  }, [viewer, pick, active])
+  }, [viewer, pick])
 }
 
 function useMarkers(viewer: Viewer | null) {
@@ -114,40 +125,45 @@ function useMarkers(viewer: Viewer | null) {
 }
 
 function useRouteLine(viewer: Viewer | null) {
-  const route = useApp((s) => s.route)
+  const plan = useApp((s) => s.plan)
   const status = useApp((s) => s.routeStatus)
   const from = useApp((s) => s.from)
   const to = useApp((s) => s.to)
+  const framed = useRef<string | null>(null)
 
   useEffect(() => {
     if (!viewer) return
     const c = palette()
     const added: Entity[] = []
+    const cells = status === 'error' ? null : routeCells(plan)
     const stale = status === 'loading'
-    if (route && status !== 'error') {
-      const positions = route.points.map((p) => at(p))
+    if (cells) {
+      const positions = cells.map((p) => at(p))
       added.push(
         viewer.entities.add({
           id: 'route:underlay',
-          polyline: {
-            positions,
-            width: 7,
-            material: c.ground.withAlpha(stale ? 0.3 : 0.7),
-            clampToGround: true,
-            zIndex: 0,
-          },
+          polyline: { positions, width: 7, material: c.ground.withAlpha(stale ? 0.3 : 0.7), clampToGround: true, zIndex: 0 },
         }),
         viewer.entities.add({
           id: 'route:line',
-          polyline: {
-            positions,
-            width: 4,
-            material: c.accent.withAlpha(stale ? 0.45 : 1),
-            clampToGround: true,
-            zIndex: 1,
-          },
+          polyline: { positions, width: 4, material: c.accent.withAlpha(stale ? 0.45 : 1), clampToGround: true, zIndex: 1 },
         }),
       )
+      // HIGH-risk stretches: a thin rust line on top, from the midpoint before the run to the midpoint after it.
+      const mid = (a: RouteCell, b: RouteCell) => at({ lon: (a.lon + b.lon) / 2, lat: (a.lat + b.lat) / 2 })
+      highRiskRuns(cells).forEach(([i, j], k) => {
+        const pts: Cartesian3[] = []
+        if (i > 0) pts.push(mid(cells[i - 1], cells[i]))
+        for (let n = i; n <= j; n++) pts.push(at(cells[n]))
+        if (j < cells.length - 1) pts.push(mid(cells[j], cells[j + 1]))
+        if (pts.length < 2) return
+        added.push(
+          viewer.entities.add({
+            id: `route:risk:${k}`,
+            polyline: { positions: pts, width: 2, material: c.rust.withAlpha(stale ? 0.4 : 0.95), clampToGround: true, zIndex: 2 },
+          }),
+        )
+      })
     } else if (from && to) {
       // No route yet (or none possible): a faint straight hint between the points.
       added.push(
@@ -169,34 +185,36 @@ function useRouteLine(viewer: Viewer | null) {
       added.forEach((e) => viewer.entities.remove(e))
       viewer.scene.requestRender()
     }
-  }, [viewer, route, status, from, to])
+  }, [viewer, plan, status, from, to])
 
-  // Frame a freshly arrived route.
+  // Frame a route with new end cells or mode; a new departure hour alone keeps the view.
   useEffect(() => {
-    if (!viewer || !route || route.points.length < 2) return
-    const sphere = BoundingSphere.fromPoints(route.points.map((p) => at(p)))
-    // Side panels cover ~half the width, so frame wider than the bare fit.
-    const range = Math.max(5000, sphere.radius * 3.8)
-    viewer.camera.flyToBoundingSphere(sphere, {
-      offset: new HeadingPitchRange(viewer.camera.heading, CMath.toRadians(-48), range),
-      duration: prefersReducedMotion() ? 0 : 1.6,
-    })
+    const cells = routeCells(plan)
+    if (!plan || !cells) {
+      if (!plan) framed.current = null
+      return
+    }
+    const key = `${plan.startCellId}>${plan.goalCellId}:${plan.mode}`
+    if (!viewer || framed.current === key) return
+    framed.current = key
+    flyToPoints(viewer, cells)
     viewer.scene.requestRender()
-  }, [viewer, route])
+  }, [viewer, plan])
 }
 
 function useHoverMarker(viewer: Viewer | null) {
-  const route = useApp((s) => s.route)
+  const plan = useApp((s) => s.plan)
   const hoverIndex = useApp((s) => s.hoverIndex)
   const marker = useRef<Entity | null>(null)
+  const cells = routeCells(plan)
 
   useEffect(() => {
-    if (!viewer || !route) return
+    if (!viewer || !cells) return
     const c = palette()
     const m = viewer.entities.add({
       id: 'route:hover',
       show: false,
-      position: new ConstantPositionProperty(at(route.points[0])),
+      position: new ConstantPositionProperty(at(cells[0])),
       point: {
         pixelSize: 9,
         color: c.text,
@@ -213,36 +231,22 @@ function useHoverMarker(viewer: Viewer | null) {
       viewer.entities.remove(m)
       viewer.scene.requestRender()
     }
-  }, [viewer, route])
+  }, [viewer, cells])
 
   useEffect(() => {
     const m = marker.current
-    if (!viewer || !m || !route) return
-    const p = hoverIndex == null ? undefined : route.points[hoverIndex]
+    if (!viewer || !m || !cells) return
+    const p = hoverIndex == null ? undefined : cells[hoverIndex]
     if (p) (m.position as ConstantPositionProperty).setValue(at(p))
     m.show = !!p
     viewer.scene.requestRender()
-  }, [viewer, route, hoverIndex])
+  }, [viewer, cells, hoverIndex])
 }
-
-/** Same edge blend as map/terrain.ts, so replay points sit on the shown surface. */
-const EDGE_FADE = 0.08
-function edgeMask([w, s, e, n]: BBox, { lon, lat }: LonLat): number {
-  const u = Math.min(lon - w, e - lon) / (e - w)
-  const v = Math.min(lat - s, n - lat) / (n - s)
-  const k = Math.min(u, v) / EDGE_FADE
-  if (k >= 1) return 1
-  if (k <= 0) return 0
-  return k * k * (3 - 2 * k)
-}
-
-const MAX_REPLAY_POINTS = 100_000
-const REPLAY_LIFT = 30
 
 interface Replay {
   pts: PointPrimitive[]
   cells: LonLat[]
-  /** Displayed height before vertical exaggeration, per cell. */
+  /** Ground height before vertical exaggeration, per cell. */
   base: number[]
 }
 
@@ -257,43 +261,39 @@ function useSearchReplay(viewer: Viewer | null) {
   useEffect(() => {
     const visited = playing ? results[playing]?.visited : undefined
     if (!viewer || !visited?.length) return
-    const { terrain, regions, activeRegionId, exaggeration: x } = useApp.getState()
-    const grid = activeRegionId ? terrain[activeRegionId] : undefined
-    const region = regions.find((r) => r.id === activeRegionId)
     const cells: LonLat[] = visited.slice(0, MAX_REPLAY_POINTS).map(([lon, lat]) => ({ lon, lat }))
-    const base = cells.map((p) => {
-      if (!grid || !region) return 0
-      const h = sample(grid, grid.heights, p)
-      return Number.isNaN(h) ? 0 : displayHeight(region, h) * edgeMask(grid.bbox, p)
-    })
-
     const c = palette()
     const color = (playing === 'astar' ? c.text : c.text3).withAlpha(0.75)
     const collection = new PointPrimitiveCollection()
-    const pts: PointPrimitive[] = cells.map((p, i) =>
-      collection.add({
-        position: at(p, base[i] * x + REPLAY_LIFT),
-        pixelSize: 3,
-        color,
-        show: false,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      }),
-    )
     viewer.scene.primitives.add(collection)
-    replay.current = { pts, cells, base }
-
     let frame = 0
-    let shown = 0
-    const reveal = (n: number) => {
-      for (; shown < n; shown++) pts[shown].show = true
-      viewer.scene.requestRender()
-    }
-    if (prefersReducedMotion()) {
-      reveal(pts.length)
-    } else {
+    let cancelled = false
+
+    const begin = (base: number[], depthTest: boolean) => {
+      if (cancelled || viewer.isDestroyed()) return
+      const x = useApp.getState().exaggeration
+      const pts = cells.map((p, i) =>
+        collection.add({
+          position: at(p, base[i] * x + REPLAY_LIFT),
+          pixelSize: 3,
+          color,
+          show: false,
+          disableDepthTestDistance: depthTest ? REPLAY_NO_DEPTH_M : Number.POSITIVE_INFINITY,
+        }),
+      )
+      replay.current = { pts, cells, base }
+      let shown = 0
+      const reveal = (n: number) => {
+        for (; shown < n; shown++) pts[shown].show = true
+        viewer.scene.requestRender()
+      }
+      if (prefersReducedMotion()) {
+        reveal(pts.length)
+        return
+      }
       const start = performance.now()
       const tick = (now: number) => {
-        if (viewer.isDestroyed()) return
+        if (cancelled || viewer.isDestroyed()) return
         const k = Math.min(1, (now - start) / REPLAY_MS)
         reveal(Math.ceil(k * pts.length))
         if (k < 1) frame = requestAnimationFrame(tick)
@@ -301,7 +301,16 @@ function useSearchReplay(viewer: Viewer | null) {
       frame = requestAnimationFrame(tick)
     }
 
+    // PointPrimitive has no height reference, so read the relief once and lift the points above it.
+    // If terrain cannot be sampled, draw at the datum and ignore depth so they stay visible.
+    const carts = cells.map((p) => Cartographic.fromDegrees(p.lon, p.lat))
+    sampleTerrain(viewer.terrainProvider, REPLAY_TERRAIN_LEVEL, carts).then(
+      (r) => begin(r.map((k) => (Number.isFinite(k.height) ? k.height : 0)), true),
+      () => begin(cells.map(() => 0), false),
+    )
+
     return () => {
+      cancelled = true
       cancelAnimationFrame(frame)
       replay.current = null
       if (viewer.isDestroyed()) return

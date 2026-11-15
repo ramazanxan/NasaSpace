@@ -49,6 +49,12 @@
   white-space: nowrap;
 }
 
+.sol-timeline__hint {
+  max-width: 200px;
+  margin-top: 2px;
+  color: var(--c-text-3);
+}
+
 /* sun arc */
 .sun-arc {
   flex: none;

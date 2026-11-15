@@ -1,13 +1,24 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowUpDown, Crosshair, Footprints, RotateCcw, Truck, X } from 'lucide-react'
-import type { LonLat, TravelMode } from '../api/types'
+import { ArrowUpDown, ChevronRight, Crosshair, Footprints, RotateCcw, Truck, X } from 'lucide-react'
+import type { LonLat, RiskLevel, RoutePlan, TravelMode } from '../api/types'
 import { formatCoord } from '../map/geo'
-import { useActiveRegion, useApp } from '../store/useApp'
+import { useApp, useProfile } from '../store/useApp'
 import { Button, IconButton, Notice, Segmented, Stat } from '../ui/primitives'
 import { fmt } from '../ui/format'
 import { ElevationProfile } from './ElevationProfile'
 import { RouteCompare } from './RouteCompare'
-import { POINT_LABEL, modeHint, solWord } from './routeUtils'
+import {
+  POINT_LABEL,
+  RISK_LABEL,
+  dustWord,
+  formatDust,
+  formatHour,
+  formatTemp,
+  noRouteMessage,
+  num,
+  profileHint,
+  solWord,
+} from './routeUtils'
 import { useRouteRequest } from './useRouteRequest'
 import './route.css'
 
@@ -15,6 +26,8 @@ const MODES: { value: TravelMode; label: string; icon: ReactNode }[] = [
   { value: 'rover', label: 'Rover', icon: <Truck size={16} strokeWidth={1.5} aria-hidden /> },
   { value: 'astronaut', label: 'Astronaut', icon: <Footprints size={16} strokeWidth={1.5} aria-hidden /> },
 ]
+
+const DASH = '—'
 
 function PointRow({ which, point }: { which: 'from' | 'to'; point: LonLat | null }) {
   const picking = useApp((s) => s.pick === which)
@@ -51,34 +64,102 @@ function PointRow({ which, point }: { which: 'from' | 'to'; point: LonLat | null
   )
 }
 
-function RouteStats() {
-  const route = useApp((s) => s.route)
-  const status = useApp((s) => s.routeStatus)
-  if (!route) return null
-  const { length, ascent, maxSlope, sols } = route.stats
+function RiskValue({ level }: { level: RiskLevel | null }) {
+  if (!level || !RISK_LABEL[level]) return <>{DASH}</>
   return (
-    <div className="route-stats" data-stale={status === 'loading' || undefined} aria-busy={status === 'loading'}>
+    <span className="route-risk" data-level={level}>
+      <span className="route-risk__dot" aria-hidden />
+      {RISK_LABEL[level]}
+    </span>
+  )
+}
+
+function RouteStats({ plan, stale }: { plan: RoutePlan; stale: boolean }) {
+  const m = plan.metrics
+  if (!m) return null
+  const length = num(m.distanceMeters) ?? 0
+  const ascent = num(m.ascentMeters)
+  const slope = num(m.maxSlopeWithMarginDeg)
+  const sols = num(m.travelSols)
+  const dust = num(m.maxDustIndex)
+  const tMin = num(m.minSurfaceTempC)
+  const tMax = num(m.maxSurfaceTempC)
+  const temps =
+    tMin == null || tMax == null
+      ? DASH
+      : Math.round(tMin) === Math.round(tMax)
+        ? formatTemp(tMin)
+        : `${formatTemp(tMin)}…${formatTemp(tMax)}`
+  return (
+    <div className="route-stats" data-stale={stale || undefined} aria-busy={stale}>
       <div className="route-stats__main">
         <Stat label="Route length" value={fmt.km(length)} unit={fmt.kmUnit(length)} />
       </div>
       <div className="route-stats__row">
-        <Stat label="Ascent" value={fmt.int(ascent)} unit="m" />
-        <Stat label="Max slope" value={fmt.deg(maxSlope)} unit="°" />
-        <Stat label="Travel time" value={sols.toLocaleString('en-US', { maximumFractionDigits: 1 })} unit={solWord(sols)} />
+        <Stat label="Ascent" value={ascent == null ? DASH : fmt.int(ascent)} unit={ascent == null ? undefined : 'm'} />
+        <Stat label="Max slope" value={slope == null ? DASH : fmt.deg(slope)} unit={slope == null ? undefined : '°'} />
+        <Stat
+          label="Travel time"
+          value={sols == null ? DASH : sols.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+          unit={sols == null ? undefined : solWord(sols)}
+        />
+      </div>
+      <div className="route-stats__row route-stats__row--quiet">
+        <Stat
+          label="Max dust"
+          value={dust == null ? DASH : formatDust(dust)}
+          unit={dust == null ? undefined : dustWord(dust)}
+        />
+        <Stat label="Surface" value={temps} unit={temps === DASH ? undefined : '°C'} />
+        <Stat label="Risk" value={<RiskValue level={m.riskLevel ?? null} />} />
       </div>
     </div>
   )
 }
 
+function ModelNotes({ notes }: { notes: string[] }) {
+  if (!notes.length) return null
+  return (
+    <details className="route-notes">
+      <summary className="route-notes__summary">
+        <ChevronRight size={16} strokeWidth={1.5} aria-hidden className="route-notes__chevron" />
+        Model notes
+        <span className="route-notes__count">{notes.length}</span>
+      </summary>
+      <ul className="route-notes__list">
+        {notes.map((n, i) => (
+          <li key={i}>{n}</li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
+function OfflineNotice() {
+  return (
+    <section className="route-panel" aria-labelledby="route-title">
+      <h2 id="route-title" className="route-panel__title">
+        Route
+      </h2>
+      <Notice>
+        Route server is offline. The map, NASA Trek layers, place search and the sun timeline still work; routing
+        returns as soon as the server answers.
+      </Notice>
+    </section>
+  )
+}
+
 export function RoutePanel() {
-  const region = useActiveRegion()
+  const backend = useApp((s) => s.backend)
   const from = useApp((s) => s.from)
   const to = useApp((s) => s.to)
   const mode = useApp((s) => s.mode)
+  const hour = useApp((s) => s.hour)
   const pick = useApp((s) => s.pick)
-  const route = useApp((s) => s.route)
+  const plan = useApp((s) => s.plan)
   const status = useApp((s) => s.routeStatus)
   const error = useApp((s) => s.routeError)
+  const profile = useProfile()
   const { setMode, setPick, setPoint, clearRoute } = useApp.getState()
   const [retry, setRetry] = useState(0)
 
@@ -94,21 +175,16 @@ export function RoutePanel() {
     return () => window.removeEventListener('keydown', onKey)
   }, [pick, setPick])
 
-  if (!region) {
-    return (
-      <section className="route-panel" aria-labelledby="route-title">
-        <h2 id="route-title" className="route-panel__title">
-          Route
-        </h2>
-        <p className="route-empty">Open a region on the map or in the list to plan a route</p>
-      </section>
-    )
-  }
+  if (backend === 'offline') return <OfflineNotice />
 
   const swap = () => {
     setPoint('from', to)
     setPoint('to', from)
   }
+
+  const cells = plan?.status === 'OK' ? (plan.route?.cells ?? []) : []
+  const warnings = Array.isArray(plan?.warnings) ? plan.warnings : []
+  const loading = status === 'loading'
 
   return (
     <section className="route-panel" aria-labelledby="route-title">
@@ -116,7 +192,6 @@ export function RoutePanel() {
         <h2 id="route-title" className="route-panel__title">
           Route
         </h2>
-        <span className="route-panel__region">{region.name}</span>
         {(from || to) && (
           <IconButton label="Reset route" onClick={clearRoute} className="route-panel__reset">
             <RotateCcw size={16} strokeWidth={1.5} aria-hidden />
@@ -136,18 +211,23 @@ export function RoutePanel() {
 
       <div className="route-mode">
         <Segmented label="Travel mode" value={mode} options={MODES} onChange={setMode} />
-        <p className="route-mode__hint">{modeHint(mode)}</p>
+        {profile && <p className="route-mode__hint">{profileHint(profile)}</p>}
+        <p className="route-mode__hint">
+          Departure {formatHour(hour)} local time — change it on the timeline below
+        </p>
       </div>
 
       {!from || !to ? (
         <p className="route-empty">
-          {pick
-            ? 'Esc to cancel picking'
-            : 'Set points A and B with the crosshair button or from a place card'}
+          {pick ? 'Esc to cancel picking' : 'Set points A and B with the crosshair button or from a place card'}
+        </p>
+      ) : backend !== 'online' ? (
+        <p className="route-status" role="status">
+          Connecting to the route server…
         </p>
       ) : (
         <>
-          {status === 'loading' && !route && (
+          {loading && !plan && (
             <p className="route-status" role="status">
               Planning route…
             </p>
@@ -156,23 +236,31 @@ export function RoutePanel() {
             <div className="route-error">
               <Notice tone="error">{error}</Notice>
               {retryable && (
-              <Button
-                variant="ghost"
-                icon={<RotateCcw size={16} strokeWidth={1.5} aria-hidden />}
-                onClick={() => setRetry((n) => n + 1)}
-              >
-                Retry
-              </Button>
+                <Button
+                  variant="ghost"
+                  icon={<RotateCcw size={16} strokeWidth={1.5} aria-hidden />}
+                  onClick={() => setRetry((n) => n + 1)}
+                >
+                  Retry
+                </Button>
               )}
             </div>
           )}
-          {route && status !== 'error' && (
+          {plan && status !== 'error' && plan.status === 'NO_ROUTE' && (
+            <div className="route-error" data-stale={loading || undefined}>
+              <Notice>{noRouteMessage(plan, profile)}</Notice>
+            </div>
+          )}
+          {plan && status !== 'error' && plan.status === 'OK' && (
             <>
-              <RouteStats />
-              <ElevationProfile points={route.points} />
-              {status === 'ready' && <RouteCompare req={{ regionId: region.id, from, to, mode }} />}
+              <RouteStats plan={plan} stale={loading} />
+              {cells.length > 1 && <ElevationProfile cells={cells} />}
+              {status === 'ready' && (
+                <RouteCompare req={{ start: from, goal: to, mode, departureHour: plan.departureHour ?? hour }} />
+              )}
             </>
           )}
+          {plan && status !== 'error' && <ModelNotes notes={warnings} />}
         </>
       )}
     </section>

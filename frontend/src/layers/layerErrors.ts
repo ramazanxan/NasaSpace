@@ -1,7 +1,8 @@
 import { create } from 'zustand'
+import type { TrekOverlayId } from '../store/useApp'
 
-/** Load failures for map layers, local to the layers feature. Keyed by 'slope' | 'hazard' | 'trails'. */
-export type LayerErrorKey = 'slope' | 'hazard' | 'trails'
+/** Load failures for map layers, local to the layers feature. */
+export type LayerErrorKey = TrekOverlayId | 'analysis'
 
 interface LayerErrors {
   errors: Partial<Record<LayerErrorKey, string>>
@@ -20,8 +21,9 @@ export const useLayerErrors = create<LayerErrors>((set) => ({
     }),
 }))
 
-export const LAYER_ERROR_TEXT: Record<LayerErrorKey, string> = {
-  slope: 'Could not load the slope layer. Try again later',
-  hazard: 'Could not load the hazard layer. Try again later',
-  trails: 'Could not load trails. Try again later',
+export const TREK_ERROR_TEXT: Record<TrekOverlayId, string> = {
+  dust: 'Could not load the dust map from NASA Trek. Try again later',
+  'thermal-inertia': 'Could not load the thermal inertia map from NASA Trek. Try again later',
 }
+
+export const analysisErrorText = (title: string) => `Could not load the ${title.toLowerCase()} layer. Try again later`

@@ -90,9 +90,17 @@ select {
   position: absolute;
   top: var(--s-4);
   right: calc(var(--panel-w-right) + var(--s-8));
+  left: calc(var(--panel-w) + var(--s-8));
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--s-2);
-  align-items: flex-start;
+  align-items: stretch;
+  pointer-events: none;
+}
+
+.map-tools > * {
+  pointer-events: auto;
 }
 
 .dock {
@@ -210,6 +218,36 @@ select {
   align-items: center;
   gap: var(--s-3);
   width: 200px;
+}
+
+.basemap-switch {
+  width: 220px;
+}
+
+.basemap-switch .segmented {
+  background: var(--c-surface);
+  height: 100%;
+}
+
+.brand__mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-text-3);
+}
+
+.brand__mode--online .brand__dot {
+  background: var(--c-ok);
+}
+
+.brand__mode--offline .brand__dot {
+  background: var(--c-warn);
 }
 
 .terrain-controls .slider {

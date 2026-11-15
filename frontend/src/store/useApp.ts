@@ -1,125 +1,149 @@
 import { create } from 'zustand'
-import type { LayerKind, LonLat, Place, Region, Route, TerrainGrid, TravelMode } from '../api/types'
+import type {
+  AnalysisLayerId,
+  GridInfo,
+  LayerCatalog,
+  LonLat,
+  Place,
+  RoutePlan,
+  TravelMode,
+} from '../api/types'
 
 /**
  * Global app state. One store, one slice per feature area.
- * Feature folders read and write only their own slice plus `region`.
+ * Feature folders read what they need and write only their own slice.
  */
 
 export type RouteStatus = 'idle' | 'loading' | 'ready' | 'error'
 export type PickTarget = 'from' | 'to' | null
+export type BackendStatus = 'unknown' | 'online' | 'offline'
 
-export interface LayerState {
+/** 'natural' = Viking colour imagery, 'elevation' = MOLA + HRSC colour hillshade. */
+export type Basemap = 'natural' | 'elevation'
+
+/** Trek imagery overlays drawn straight from NASA tiles. */
+export type TrekOverlayId = 'dust' | 'thermal-inertia'
+
+export interface OverlayState {
   visible: boolean
   opacity: number
 }
 
 interface AppState {
-  // region / map
-  regions: Region[]
-  activeRegionId: string | null
-  terrain: Record<string, TerrainGrid>
+  // backend
+  backend: BackendStatus
+  grid: GridInfo | null
+  catalog: LayerCatalog | null
+  setBackend: (p: { backend: BackendStatus; grid?: GridInfo | null; catalog?: LayerCatalog | null }) => void
+
+  // map
+  basemap: Basemap
   exaggeration: number
-  setRegions: (r: Region[]) => void
-  setActiveRegion: (id: string | null) => void
-  putTerrain: (t: TerrainGrid) => void
+  setBasemap: (b: Basemap) => void
   setExaggeration: (x: number) => void
 
   // place
+  /** A named place picked from search or the list. */
   selectedPlace: Place | null
+  /** A bare point the user clicked on the map to inspect the surface there. */
+  inspected: LonLat | null
   selectPlace: (p: Place | null) => void
+  inspect: (p: LonLat | null) => void
 
   // route
   from: LonLat | null
   to: LonLat | null
   mode: TravelMode
   pick: PickTarget
-  route: Route | null
+  plan: RoutePlan | null
   routeStatus: RouteStatus
   routeError: string | null
-  /** Index into route.points under the cursor in the elevation profile. */
+  /** Index into plan.route.cells under the cursor in the elevation profile. */
   hoverIndex: number | null
   setPoint: (which: 'from' | 'to', p: LonLat | null) => void
   setMode: (m: TravelMode) => void
   setPick: (t: PickTarget) => void
-  setRouteResult: (r: { status: RouteStatus; route?: Route | null; error?: string | null }) => void
+  setRouteResult: (r: { status: RouteStatus; plan?: RoutePlan | null; error?: string | null }) => void
   setHoverIndex: (i: number | null) => void
   clearRoute: () => void
 
   // layers
-  layers: Record<LayerKind, LayerState>
-  showTrails: boolean
+  trek: Record<TrekOverlayId, OverlayState>
+  /** One backend analysis layer at a time, or none. */
+  analysis: { id: AnalysisLayerId | null; opacity: number }
   showRovers: boolean
-  setLayer: (k: LayerKind, patch: Partial<LayerState>) => void
-  setShowTrails: (v: boolean) => void
+  showGridArea: boolean
+  setTrek: (id: TrekOverlayId, patch: Partial<OverlayState>) => void
+  setAnalysis: (patch: Partial<{ id: AnalysisLayerId | null; opacity: number }>) => void
   setShowRovers: (v: boolean) => void
+  setShowGridArea: (v: boolean) => void
 
   // time
   sol: number
+  /** Local solar hour 0..24; also the departure hour for routing. */
   hour: number
   setTime: (t: { sol?: number; hour?: number }) => void
 }
 
 export const useApp = create<AppState>((set) => ({
-  regions: [],
-  activeRegionId: null,
-  terrain: {},
-  exaggeration: 2,
-  setRegions: (regions) => set({ regions }),
-  setActiveRegion: (activeRegionId) =>
-    set((s) => {
-      if (s.activeRegionId === activeRegionId) return {}
-      if (activeRegionId && !s.regions.some((r) => r.id === activeRegionId)) return {}
-      return {
-        activeRegionId,
-        selectedPlace: s.selectedPlace?.regionId === activeRegionId ? s.selectedPlace : null,
-        from: null,
-        to: null,
-        pick: null,
-        route: null,
-        routeStatus: 'idle',
-        routeError: null,
-        hoverIndex: null,
-      }
-    }),
-  putTerrain: (t) => set((s) => ({ terrain: { ...s.terrain, [t.regionId]: t } })),
+  backend: 'unknown',
+  grid: null,
+  catalog: null,
+  setBackend: ({ backend, grid, catalog }) =>
+    set((s) => ({
+      backend,
+      grid: grid === undefined ? s.grid : grid,
+      catalog: catalog === undefined ? s.catalog : catalog,
+    })),
+
+  basemap: 'natural',
+  exaggeration: 3,
+  setBasemap: (basemap) => set({ basemap }),
   setExaggeration: (exaggeration) => set({ exaggeration }),
 
   selectedPlace: null,
-  selectPlace: (selectedPlace) => set({ selectedPlace }),
+  inspected: null,
+  selectPlace: (selectedPlace) => set({ selectedPlace, inspected: null }),
+  inspect: (inspected) => set({ inspected, selectedPlace: null }),
 
   from: null,
   to: null,
   mode: 'rover',
   pick: null,
-  route: null,
+  plan: null,
   routeStatus: 'idle',
   routeError: null,
   hoverIndex: null,
   setPoint: (which, p) => set({ [which]: p, pick: null } as Partial<AppState>),
   setMode: (mode) => set({ mode }),
   setPick: (pick) => set({ pick }),
-  setRouteResult: ({ status, route, error }) =>
+  setRouteResult: ({ status, plan, error }) =>
     set((s) => ({
       routeStatus: status,
-      route: route === undefined ? s.route : route,
+      plan: plan === undefined ? s.plan : plan,
       routeError: error ?? null,
       hoverIndex: null,
     })),
   setHoverIndex: (hoverIndex) => set({ hoverIndex }),
-  clearRoute: () => set({ from: null, to: null, route: null, routeStatus: 'idle', routeError: null, hoverIndex: null, pick: null }),
+  clearRoute: () =>
+    set({ from: null, to: null, plan: null, routeStatus: 'idle', routeError: null, hoverIndex: null, pick: null }),
 
-  layers: { slope: { visible: false, opacity: 0.6 }, hazard: { visible: false, opacity: 0.6 } },
-  showTrails: false,
+  trek: {
+    dust: { visible: false, opacity: 0.6 },
+    'thermal-inertia': { visible: false, opacity: 0.6 },
+  },
+  analysis: { id: null, opacity: 0.7 },
   showRovers: true,
-  setLayer: (k, patch) => set((s) => ({ layers: { ...s.layers, [k]: { ...s.layers[k], ...patch } } })),
-  setShowTrails: (showTrails) => set({ showTrails }),
+  showGridArea: true,
+  setTrek: (id, patch) => set((s) => ({ trek: { ...s.trek, [id]: { ...s.trek[id], ...patch } } })),
+  setAnalysis: (patch) => set((s) => ({ analysis: { ...s.analysis, ...patch } })),
   setShowRovers: (showRovers) => set({ showRovers }),
+  setShowGridArea: (showGridArea) => set({ showGridArea }),
 
   sol: 120,
   hour: 13,
   setTime: (t) => set(t),
 }))
 
-export const useActiveRegion = () =>
-  useApp((s) => s.regions.find((r) => r.id === s.activeRegionId) ?? null)
+/** The mobility profile for the current mode, once the backend has reported it. */
+export const useProfile = () => useApp((s) => s.grid?.profiles.find((p) => p.id === s.mode) ?? null)

@@ -8,83 +8,74 @@ import {
   Math as CMath,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
-  UrlTemplateImageryProvider,
   Viewer,
   defined,
   type Entity,
 } from 'cesium'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
-import { api } from '../api/client'
+import { PLACES } from '../api/places'
 import { useApp } from '../store/useApp'
-import { createTerrainProvider, marsTilingScheme } from './terrain'
+import { flyHome, flyToPlace } from './camera'
+import { PLACE_ENTITY_PREFIX, useGridArea, usePlaceLabels } from './annotations'
+import { createMolaTerrainProvider } from './terrain'
+import { trekProvider } from './trek'
 import { emitClick, emitMove, hasMoveHandlers, onMapClick, setViewer, useViewer, type MapPointerEvent } from './viewerRef'
-import { flyHome, flyToRegion } from './camera'
-import { REGION_ENTITY_PREFIX, useRegionOutlines } from './regionOutlines'
 
 // Must be set before any Cesium object is created: every default ellipsoid becomes Mars.
 Ellipsoid.default = Ellipsoid.MARS
 
-const TREK = 'https://trek.nasa.gov/tiles/Mars/EQ'
-/** Viking colour mosaic, 232 m/px. Public NASA tiles with CORS enabled. */
-const MARS_IMAGERY = `${TREK}/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg`
-/** MRO CTX greyscale mosaic, ~5 m/px, 512 px tiles. Published through Mars Trek (Esri Astro), CORS enabled. */
-const MARS_CTX = 'https://astro.arcgis.com/arcgis/rest/services/OnMars/CTX/MapServer/tile/{z}/{y}/{x}'
-
-const vikingProvider = () =>
-  new UrlTemplateImageryProvider({
-    url: MARS_IMAGERY,
-    tilingScheme: marsTilingScheme(),
-    maximumLevel: 7,
-    credit: 'NASA/JPL Mars Trek · Viking MDIM 2.1',
-  })
+/** The imagery layers the base-map switch controls. */
+interface BaseLayers {
+  viking: ImageryLayer
+  ctx: ImageryLayer
+  tint: ImageryLayer
+  elevation: ImageryLayer
+}
 
 /**
- * Close up, the 232 m Viking colour mosaic turns to mush. Above it we lay the
- * 5 m CTX greyscale mosaic, then Viking again at low alpha to bring the colour
- * back. Both extra layers appear only once the camera is near the ground.
+ * Two base maps share one globe.
+ * - Natural: Viking colour; close up, the 5 m CTX greyscale mosaic with Viking
+ *   laid over it at half strength to keep the colour.
+ * - Elevation: MOLA + HRSC colour hillshade, where colour is height.
  */
-function addDetailImagery(viewer: Viewer) {
+function addBaseLayers(viewer: Viewer): BaseLayers {
   const layers = viewer.imageryLayers
-  const ctx = new ImageryLayer(
-    new UrlTemplateImageryProvider({
-      url: MARS_CTX,
-      tilingScheme: marsTilingScheme(),
-      tileWidth: 512,
-      tileHeight: 512,
-      maximumLevel: 12,
-      credit: 'NASA/JPL/MSSS · MRO CTX mosaic (Caltech Murray Lab), via Mars Trek',
-    }),
-    { minimumTerrainLevel: 6, brightness: 1.05, contrast: 1.1 },
-  )
-  const tint = new ImageryLayer(vikingProvider(), { minimumTerrainLevel: 6, alpha: 0.5 })
+  const viking = layers.get(0)
+  const ctx = new ImageryLayer(trekProvider('ctx'), { minimumTerrainLevel: 6, brightness: 1.05, contrast: 1.1 })
+  const tint = new ImageryLayer(trekProvider('viking'), { minimumTerrainLevel: 6, alpha: 0.5 })
+  const elevation = new ImageryLayer(trekProvider('elevation'), { show: false })
   layers.add(ctx)
   layers.add(tint)
+  layers.add(elevation)
+  return { viking, ctx, tint, elevation }
 }
 
 function pointerEvent(viewer: Viewer, pos: Cartesian2): MapPointerEvent {
+  const picking = useApp.getState().pick !== null
   const picked = viewer.scene.pick(pos) as { id?: Entity } | undefined
   const entityId = defined(picked) && picked?.id && typeof picked.id.id === 'string' ? picked.id.id : null
   const ray = viewer.camera.getPickRay(pos)
   const cart = ray ? viewer.scene.globe.pick(ray, viewer.scene) : undefined
-  if (!cart) return { position: null, entityId }
+  if (!cart) return { position: null, entityId, picking }
   const c = Cartographic.fromCartesian(cart, Ellipsoid.MARS)
-  return { position: { lon: CMath.toDegrees(c.longitude), lat: CMath.toDegrees(c.latitude) }, entityId }
+  return { position: { lon: CMath.toDegrees(c.longitude), lat: CMath.toDegrees(c.latitude) }, entityId, picking }
 }
 
 export function MarsViewer() {
   const host = useRef<HTMLDivElement>(null)
-  const viewerRef = useRef<Viewer | null>(null)
-  const regions = useApp((s) => s.regions)
-  const activeRegionId = useApp((s) => s.activeRegionId)
-  const terrain = useApp((s) => s.terrain)
+  const base = useRef<BaseLayers | null>(null)
+  const viewer = useViewer()
+  const basemap = useApp((s) => s.basemap)
   const exaggeration = useApp((s) => s.exaggeration)
+  const grid = useApp((s) => s.grid)
+  const showGridArea = useApp((s) => s.showGridArea)
 
   // Create the viewer once.
   useEffect(() => {
     if (!host.current) return
-    const viewer = new Viewer(host.current, {
-      baseLayer: new ImageryLayer(vikingProvider()),
-      terrainProvider: createTerrainProvider([]),
+    const v = new Viewer(host.current, {
+      baseLayer: new ImageryLayer(trekProvider('viking')),
+      terrainProvider: createMolaTerrainProvider(),
       animation: false,
       timeline: false,
       baseLayerPicker: false,
@@ -99,9 +90,10 @@ export function MarsViewer() {
       requestRenderMode: true,
       maximumRenderTimeChange: Infinity,
     })
+    // Render at the display's real pixel density so imagery and labels stay crisp.
+    v.useBrowserRecommendedResolution = false
 
-    addDetailImagery(viewer)
-    const { scene } = viewer
+    const { scene } = v
     scene.backgroundColor = Color.fromCssColorString('#0e1014')
     scene.globe.baseColor = Color.fromCssColorString('#6b3a24')
     scene.globe.showGroundAtmosphere = false
@@ -116,12 +108,14 @@ export function MarsViewer() {
     }
     scene.fog.enabled = false
     scene.verticalExaggeration = useApp.getState().exaggeration
-    scene.screenSpaceCameraController.minimumZoomDistance = 800
+    scene.screenSpaceCameraController.minimumZoomDistance = 2_000
     scene.screenSpaceCameraController.maximumZoomDistance = 30_000_000
+
+    base.current = addBaseLayers(v)
 
     const handler = new ScreenSpaceEventHandler(scene.canvas)
     handler.setInputAction((e: ScreenSpaceEventHandler.PositionedEvent) => {
-      emitClick(pointerEvent(viewer, e.position))
+      emitClick(pointerEvent(v, e.position))
     }, ScreenSpaceEventType.LEFT_CLICK)
 
     let frame = 0
@@ -129,78 +123,61 @@ export function MarsViewer() {
       if (frame || !hasMoveHandlers()) return
       frame = requestAnimationFrame(() => {
         frame = 0
-        if (!viewer.isDestroyed()) emitMove(pointerEvent(viewer, e.endPosition))
+        if (!v.isDestroyed()) emitMove(pointerEvent(v, e.endPosition))
       })
     }, ScreenSpaceEventType.MOUSE_MOVE)
 
-    flyHome(viewer, 0)
-    viewerRef.current = viewer
-    setViewer(viewer)
+    flyHome(v, 0)
+    setViewer(v)
 
     return () => {
       cancelAnimationFrame(frame)
       handler.destroy()
       setViewer(null)
-      viewerRef.current = null
-      viewer.destroy()
+      base.current = null
+      v.destroy()
     }
   }, [])
 
-  // Load the region list once.
-  useEffect(() => {
-    api.regions().then(useApp.getState().setRegions, (e) => console.error('regions', e))
-  }, [])
-
-  // Clicking a region frame or its name opens it (overview only).
+  // A plain click (not choosing a route point) opens a place label or inspects the ground.
   useEffect(
     () =>
-      onMapClick(({ entityId }) => {
-        if (!entityId?.startsWith(REGION_ENTITY_PREFIX)) return
+      onMapClick(({ position, entityId, picking }) => {
+        if (picking) return
         const s = useApp.getState()
-        if (s.activeRegionId) return
-        const id = entityId.slice(REGION_ENTITY_PREFIX.length).replace(/:label$/, '')
-        if (s.regions.some((r) => r.id === id)) s.setActiveRegion(id)
+        if (entityId?.startsWith(PLACE_ENTITY_PREFIX)) {
+          const place = PLACES.find((p) => p.id === entityId.slice(PLACE_ENTITY_PREFIX.length))
+          if (!place) return
+          s.selectPlace(place)
+          if (viewer) flyToPlace(viewer, place)
+          return
+        }
+        if (entityId || !position) return
+        s.inspect(position)
       }),
-    [],
+    [viewer],
   )
 
-  const sharedViewer = useViewer()
-  useRegionOutlines(sharedViewer, regions, activeRegionId)
-
-  // Fetch terrain for the active region and fly there.
+  // Base-map switch.
   useEffect(() => {
-    const viewer = viewerRef.current
-    if (!viewer) return
-    const region = regions.find((r) => r.id === activeRegionId)
-    if (!region) {
-      if (regions.length) flyHome(viewer)
-      return
-    }
-    flyToRegion(viewer, region)
-    if (!useApp.getState().terrain[region.id]) {
-      api.terrain(region.id).then(useApp.getState().putTerrain, (e) => console.error('terrain', e))
-    }
-  }, [activeRegionId, regions])
-
-  // Rebuild the terrain provider whenever a new grid arrives.
-  useEffect(() => {
-    const viewer = viewerRef.current
-    if (!viewer) return
-    const grids = Object.values(terrain).flatMap((grid) => {
-      const region = regions.find((r) => r.id === grid.regionId)
-      return region ? [{ grid, region }] : []
-    })
-    viewer.terrainProvider = createTerrainProvider(grids)
+    const b = base.current
+    if (!viewer || !b) return
+    const natural = basemap === 'natural'
+    b.viking.show = natural
+    b.ctx.show = natural
+    b.tint.show = natural
+    b.elevation.show = !natural
     viewer.scene.requestRender()
-  }, [terrain, regions])
+  }, [viewer, basemap])
 
   useEffect(() => {
-    const viewer = viewerRef.current
     if (!viewer) return
     viewer.scene.verticalExaggeration = exaggeration
     viewer.scene.requestRender()
-  }, [exaggeration])
+  }, [viewer, exaggeration])
+
+  usePlaceLabels(viewer)
+  useGridArea(viewer, showGridArea ? (grid?.bbox ?? null) : null)
 
   return <div ref={host} className="mars-viewer" aria-label="3D map of Mars" role="application" />
 }
-

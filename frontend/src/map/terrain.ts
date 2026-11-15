@@ -1,68 +1,121 @@
-import { CustomHeightmapTerrainProvider, Ellipsoid, GeographicTilingScheme, Math as CMath } from 'cesium'
-import type { Region, TerrainGrid } from '../api/types'
-import { sample } from './geo'
+import { CustomHeightmapTerrainProvider } from 'cesium'
+import { MOLA_DEM, marsTilingScheme } from './trek'
 
 /**
- * Builds a Cesium terrain provider from the region grids we have loaded.
+ * Real Martian relief for the whole planet, built from the MGS MOLA global DEM
+ * that Mars Trek publishes as 8-bit grey tiles.
  *
- * Only a handful of regions carry relief; the rest of Mars stays a smooth
- * imagery sphere. Inside a region the surface shows height relative to the
- * region's base height, faded to zero near the edges so the patch blends
- * into the sphere instead of standing on a cliff.
+ * Cesium asks for a terrain tile (x, y, level); we fetch the matching DEM tile,
+ * turn its grey values into metres and hand back a small heightmap. Past the
+ * DEM's deepest level we keep reusing its last tile and interpolate inside it.
  */
 
-const TILE = 32
-const EDGE_FADE = 0.08 // share of the region width used to blend into the sphere
+const DEM_SIZE = 256
+const TILE = 65 // samples per side handed to Cesium
+const MAX_CACHED = 160
 
-export const marsTilingScheme = () => new GeographicTilingScheme({ ellipsoid: Ellipsoid.MARS })
+/** Decoded DEM tiles, most recently used last. A null entry is a tile that failed to load. */
+const cache = new Map<string, Promise<Float32Array | null>>()
 
-function edgeMask(t: TerrainGrid, lon: number, lat: number): number {
-  const [w, s, e, n] = t.bbox
-  const u = Math.min(lon - w, e - lon) / (e - w)
-  const v = Math.min(lat - s, n - lat) / (n - s)
-  const k = Math.min(u, v) / EDGE_FADE
-  if (k >= 1) return 1
-  return k * k * (3 - 2 * k)
+function remember(key: string, value: Promise<Float32Array | null>) {
+  cache.set(key, value)
+  if (cache.size > MAX_CACHED) cache.delete(cache.keys().next().value as string)
 }
 
-/** Height shown on the globe for a real height inside a region. */
-export function displayHeight(region: Pick<Region, 'baseHeight'>, h: number): number {
-  return h - region.baseHeight
+/**
+ * The DEM has only 256 grey steps, about 115 m each, which would show as
+ * terraces once exaggerated. Two light box blurs turn the steps into ramps.
+ */
+function soften(src: Float32Array): Float32Array {
+  let a = src
+  for (let pass = 0; pass < 2; pass++) {
+    const b = new Float32Array(a.length)
+    for (let r = 0; r < DEM_SIZE; r++) {
+      const r0 = Math.max(0, r - 1)
+      const r1 = Math.min(DEM_SIZE - 1, r + 1)
+      for (let c = 0; c < DEM_SIZE; c++) {
+        const c0 = Math.max(0, c - 1)
+        const c1 = Math.min(DEM_SIZE - 1, c + 1)
+        b[r * DEM_SIZE + c] =
+          (a[r0 * DEM_SIZE + c0] + a[r0 * DEM_SIZE + c] + a[r0 * DEM_SIZE + c1] +
+            a[r * DEM_SIZE + c0] + a[r * DEM_SIZE + c] + a[r * DEM_SIZE + c1] +
+            a[r1 * DEM_SIZE + c0] + a[r1 * DEM_SIZE + c] + a[r1 * DEM_SIZE + c1]) / 9
+      }
+    }
+    a = b
+  }
+  return a
 }
 
-export function createTerrainProvider(grids: { grid: TerrainGrid; region: Region }[]) {
-  const tiling = marsTilingScheme()
+async function decode(z: number, y: number, x: number): Promise<Float32Array | null> {
+  try {
+    const res = await fetch(MOLA_DEM.url(z, y, x), { mode: 'cors' })
+    if (!res.ok) return null
+    const bitmap = await createImageBitmap(await res.blob())
+    const canvas = new OffscreenCanvas(DEM_SIZE, DEM_SIZE)
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) return null
+    ctx.drawImage(bitmap, 0, 0, DEM_SIZE, DEM_SIZE)
+    bitmap.close()
+    const px = ctx.getImageData(0, 0, DEM_SIZE, DEM_SIZE).data
+    const span = MOLA_DEM.maxHeight - MOLA_DEM.minHeight
+    const heights = new Float32Array(DEM_SIZE * DEM_SIZE)
+    for (let i = 0; i < heights.length; i++) {
+      // Transparent pixels carry no measurement; treat them as the datum.
+      heights[i] = px[i * 4 + 3] === 0 ? 0 : MOLA_DEM.minHeight + (px[i * 4] / 255) * span
+    }
+    return soften(heights)
+  } catch {
+    return null
+  }
+}
 
+function demTile(z: number, y: number, x: number): Promise<Float32Array | null> {
+  const key = `${z}/${y}/${x}`
+  const hit = cache.get(key)
+  if (hit) {
+    cache.delete(key)
+    cache.set(key, hit)
+    return hit
+  }
+  const loading = decode(z, y, x)
+  remember(key, loading)
+  return loading
+}
+
+function bilinear(h: Float32Array, col: number, row: number): number {
+  const c = Math.min(DEM_SIZE - 1, Math.max(0, col))
+  const r = Math.min(DEM_SIZE - 1, Math.max(0, row))
+  const c0 = Math.min(DEM_SIZE - 2, Math.floor(c))
+  const r0 = Math.min(DEM_SIZE - 2, Math.floor(r))
+  const fc = c - c0
+  const fr = r - r0
+  const i = r0 * DEM_SIZE + c0
+  return (
+    h[i] * (1 - fc) * (1 - fr) + h[i + 1] * fc * (1 - fr) + h[i + DEM_SIZE] * (1 - fc) * fr + h[i + DEM_SIZE + 1] * fc * fr
+  )
+}
+
+export function createMolaTerrainProvider() {
   return new CustomHeightmapTerrainProvider({
     width: TILE,
     height: TILE,
-    tilingScheme: tiling,
-    callback: (x, y, level) => {
+    tilingScheme: marsTilingScheme(),
+    callback: async (x, y, level) => {
+      // Deeper than the DEM goes: sample a window of the deepest ancestor tile.
+      const up = Math.max(0, level - MOLA_DEM.maximumLevel)
+      const scale = 2 ** up
+      const src = await demTile(level - up, Math.floor(y / scale), Math.floor(x / scale))
       const out = new Float32Array(TILE * TILE)
-      if (!grids.length) return out
-      const rect = tiling.tileXYToRectangle(x, y, level)
-      const w = CMath.toDegrees(rect.west)
-      const e = CMath.toDegrees(rect.east)
-      const s = CMath.toDegrees(rect.south)
-      const n = CMath.toDegrees(rect.north)
-
-      const hits = grids.filter(({ grid }) => {
-        const [gw, gs, ge, gn] = grid.bbox
-        return gw < e && ge > w && gs < n && gn > s
-      })
-      if (!hits.length) return out
-
+      if (!src) return out
+      const u0 = (x % scale) / scale
+      const v0 = (y % scale) / scale
+      const span = (DEM_SIZE - 1) / scale
       for (let r = 0; r < TILE; r++) {
-        const lat = n - (r / (TILE - 1)) * (n - s)
+        const row = v0 * (DEM_SIZE - 1) + (r / (TILE - 1)) * span
         for (let c = 0; c < TILE; c++) {
-          const lon = w + (c / (TILE - 1)) * (e - w)
-          for (const { grid, region } of hits) {
-            const h = sample(grid, grid.heights, { lon, lat })
-            if (!Number.isNaN(h)) {
-              out[r * TILE + c] = displayHeight(region, h) * edgeMask(grid, lon, lat)
-              break
-            }
-          }
+          const col = u0 * (DEM_SIZE - 1) + (c / (TILE - 1)) * span
+          out[r * TILE + c] = bilinear(src, col, row)
         }
       }
       return out

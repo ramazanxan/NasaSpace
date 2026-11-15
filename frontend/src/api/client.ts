@@ -1,28 +1,30 @@
 import type {
+  AnalysisLayerId,
   ApiErrorBody,
   ApiErrorCode,
-  LayerGrid,
-  LayerKind,
+  CellInfo,
+  GridInfo,
+  LayerCatalog,
   LonLat,
-  Place,
-  Region,
-  Route,
-  RouteDebug,
+  RoutePlan,
   RouteRequest,
-  SunState,
-  TerrainGrid,
-  Trail,
+  TravelMode,
 } from './types'
-import { mockApi } from './mock'
-import { MockApiError } from './mock/errors'
 
 /**
- * Single entry point for backend calls. With VITE_API_URL empty the app
- * runs entirely on in-browser mocks, so the frontend never waits for the backend.
+ * Single entry point for backend calls.
+ *
+ * The backend URL comes from VITE_API_URL; in development it defaults to the
+ * Java server's local port. Without a backend the map, the Trek layers, search
+ * and the sun readout still work — only routing and surface analysis need it.
  */
 
-const BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
-export const usingMocks = BASE === ''
+const configured = (import.meta.env.VITE_API_URL ?? '').trim()
+const ROOT = (configured || (import.meta.env.DEV ? 'http://localhost:9090' : '')).replace(/\/+$/, '')
+const BASE = ROOT ? `${ROOT}/api/v1` : ''
+
+/** False when the build has no backend URL at all (static demo). */
+export const backendConfigured = BASE !== ''
 
 export class ApiError extends Error {
   readonly status: number
@@ -34,10 +36,25 @@ export class ApiError extends Error {
   }
 }
 
-const TIMEOUT_MS = 15_000
-const ERROR_CODES = new Set<ApiErrorCode>(['OUT_OF_REGION', 'UNREACHABLE', 'BAD_REQUEST', 'NOT_FOUND', 'TOO_MANY_REQUESTS', 'INTERNAL'])
+const TIMEOUT_MS = 20_000
+const OFFLINE_MESSAGE = 'Route server is offline. Start the backend and try again'
+
+const KNOWN_CODES = new Set<ApiErrorCode>([
+  'EMPTY_REQUEST',
+  'INVALID_JSON',
+  'MISSING_POINT',
+  'INVALID_COORDINATES',
+  'INVALID_PARAMETER',
+  'POINT_OUTSIDE_GRID',
+  'CELL_NOT_FOUND',
+  'LAYER_NOT_FOUND',
+  'RATE_LIMITED',
+  'GRID_NOT_READY',
+  'INTERNAL_ERROR',
+])
 
 async function http<T>(path: string, init?: RequestInit & { signal?: AbortSignal }): Promise<T> {
+  if (!backendConfigured) throw new ApiError(0, 'OFFLINE', OFFLINE_MESSAGE)
   const timeout = AbortSignal.timeout(TIMEOUT_MS)
   const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout
   let res: Response
@@ -50,8 +67,8 @@ async function http<T>(path: string, init?: RequestInit & { signal?: AbortSignal
   } catch (e) {
     // The caller cancelled: let it see the abort. Our own timeout becomes a readable error.
     if (init?.signal?.aborted) throw e
-    if (timeout.aborted) throw new ApiError(0, 'INTERNAL', 'The route server did not respond within 15 seconds. Try again later')
-    throw new ApiError(0, 'INTERNAL', 'The route server is not responding. Check that the backend is running')
+    if (timeout.aborted) throw new ApiError(0, 'OFFLINE', 'Route server did not answer in 20 seconds. Try again')
+    throw new ApiError(0, 'OFFLINE', OFFLINE_MESSAGE)
   }
   if (!res.ok) {
     let body: Partial<ApiErrorBody> = {}
@@ -60,23 +77,15 @@ async function http<T>(path: string, init?: RequestInit & { signal?: AbortSignal
     } catch {
       // non-JSON error body
     }
-    const code = body.code && ERROR_CODES.has(body.code) ? body.code : 'INTERNAL'
-    const message = typeof body.message === 'string' && body.message ? body.message.slice(0, 300) : `Server error (${res.status})`
+    const code = body.error && KNOWN_CODES.has(body.error) ? body.error : 'INTERNAL_ERROR'
+    const message =
+      typeof body.message === 'string' && body.message ? body.message.slice(0, 300) : `Server error (${res.status})`
     throw new ApiError(res.status, code, message)
   }
   try {
     return (await res.json()) as T
   } catch {
-    throw new ApiError(res.status, 'INTERNAL', 'The server returned an invalid response')
-  }
-}
-
-async function viaMock<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn()
-  } catch (e) {
-    if (e instanceof MockApiError) throw new ApiError(e.status, e.code, e.message)
-    throw e
+    throw new ApiError(res.status, 'INTERNAL_ERROR', 'Route server sent an unreadable answer')
   }
 }
 
@@ -84,32 +93,17 @@ const q = (params: Record<string, string | number>) =>
   new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()
 
 export const api = {
-  regions: (): Promise<Region[]> => (usingMocks ? viaMock(mockApi.regions) : http('/regions')),
+  gridInfo: (signal?: AbortSignal): Promise<GridInfo> => http('/grid/info', { signal }),
 
-  terrain: (regionId: string): Promise<TerrainGrid> =>
-    usingMocks ? viaMock(() => mockApi.terrain(regionId)) : http(`/terrain/${encodeURIComponent(regionId)}`),
+  plan: (req: RouteRequest, signal?: AbortSignal): Promise<RoutePlan> =>
+    http('/routes/plan', { method: 'POST', body: JSON.stringify(req), signal }),
 
-  layer: (regionId: string, kind: LayerKind): Promise<LayerGrid> =>
-    usingMocks
-      ? viaMock(() => mockApi.layer(regionId, kind))
-      : http(`/layers/${encodeURIComponent(regionId)}/${kind}`),
+  cellAt: (p: LonLat, hour: number, signal?: AbortSignal): Promise<CellInfo> =>
+    http(`/cells/at?${q({ lon: p.lon, lat: p.lat, hour })}`, { signal }),
 
-  places: (text: string, signal?: AbortSignal): Promise<Place[]> =>
-    usingMocks ? viaMock(() => mockApi.places(text)) : http(`/places?${q({ q: text, limit: 8 })}`, { signal }),
+  layers: (signal?: AbortSignal): Promise<LayerCatalog> => http('/layers', { signal }),
 
-  route: (req: RouteRequest): Promise<Route> =>
-    usingMocks ? viaMock(() => mockApi.route(req)) : http('/route', { method: 'POST', body: JSON.stringify(req) }),
-
-  routeDebug: (req: RouteRequest, algorithm: 'astar' | 'dijkstra'): Promise<RouteDebug> =>
-    usingMocks
-      ? viaMock(() => mockApi.routeDebug(req, algorithm))
-      : http(`/route/debug?${q({ algorithm })}`, { method: 'POST', body: JSON.stringify(req) }),
-
-  trails: (regionId: string): Promise<Trail[]> =>
-    usingMocks ? viaMock(() => mockApi.trails(regionId)) : http(`/trails?${q({ regionId })}`),
-
-  sun: (p: LonLat, sol: number, hour: number): Promise<SunState> =>
-    usingMocks
-      ? viaMock(() => mockApi.sun(p, sol, hour))
-      : http(`/sun?${q({ lon: p.lon, lat: p.lat, sol, hour })}`),
+  /** URL of a rendered analysis layer; hour is rounded to half hours so images cache well. */
+  layerImageUrl: (id: AnalysisLayerId, opts: { mode: TravelMode; hour: number }): string =>
+    `${BASE}/layers/${id}.png?${q({ mode: opts.mode, hour: Math.round(opts.hour * 2) / 2 })}`,
 }

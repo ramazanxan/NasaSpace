@@ -1,14 +1,16 @@
 import { MarsViewer } from './map/MarsViewer'
+import { BasemapSwitch } from './map/BasemapSwitch'
 import { TerrainControls } from './map/TerrainControls'
 import { Brand } from './ui/Brand'
 import { SearchBox } from './search/SearchBox'
-import { RegionList } from './search/RegionList'
+import { PlaceList } from './search/PlaceList'
 import { PlaceCard } from './place/PlaceCard'
 import { RoutePanel } from './route/RoutePanel'
 import { RouteOnMap } from './route/RouteOnMap'
 import { LayersControl } from './layers/LayersControl'
 import { LayersOnMap } from './layers/LayersOnMap'
 import { SolTimeline } from './timeline/SolTimeline'
+import { useBackendBoot } from './store/useBackendBoot'
 
 /**
  * Screen layout. Each feature folder owns its component; this file only
@@ -16,6 +18,7 @@ import { SolTimeline } from './timeline/SolTimeline'
  * and remove Cesium entities for their feature.
  */
 export function App() {
+  useBackendBoot()
   return (
     <div className="app">
       <MarsViewer />
@@ -24,7 +27,7 @@ export function App() {
         <Brand />
         <SearchBox />
         <PlaceCard />
-        <RegionList />
+        <PlaceList />
       </aside>
 
       <aside className="panel panel--right" aria-label="Route">
@@ -32,6 +35,7 @@ export function App() {
       </aside>
 
       <div className="map-tools">
+        <BasemapSwitch />
         <TerrainControls />
         <LayersControl />
       </div>

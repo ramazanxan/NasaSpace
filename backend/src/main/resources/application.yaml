@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: NasaProject
+server:
+  port: 9090
+mars:
+  grid-file: data/grid.geojson

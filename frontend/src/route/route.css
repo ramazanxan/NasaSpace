@@ -20,15 +20,6 @@
   line-height: var(--lh-tight);
 }
 
-.route-panel__region {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--fs-13);
-  color: var(--c-text-3);
-}
-
 .route-panel__reset {
   margin-left: auto;
 }
@@ -189,6 +180,33 @@
   font-size: var(--fs-12);
 }
 
+/* Second row: the surface indicators, one step quieter than the travel figures. */
+.route-stats__row--quiet .stat__value {
+  font-size: var(--fs-14);
+  color: var(--c-text-2);
+}
+
+.route-risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.route-risk__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-ok);
+}
+
+.route-risk[data-level='MODERATE'] .route-risk__dot {
+  background: var(--c-warn);
+}
+
+.route-risk[data-level='HIGH'] .route-risk__dot {
+  background: var(--c-danger);
+}
+
 /* ---------- elevation profile ---------- */
 
 .route-profile {
@@ -200,8 +218,7 @@
 
 .route-profile__head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  flex-direction: column;
   gap: var(--s-2);
 }
 
@@ -221,10 +238,6 @@
 .route-profile .recharts-cartesian-axis-tick-value {
   fill: var(--c-text-3);
   font-size: var(--fs-12);
-}
-
-.route-profile .recharts-area-curve {
-  stroke: var(--c-accent);
 }
 
 .route-profile .recharts-surface:focus {
@@ -262,6 +275,58 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--s-2);
+  transition: opacity var(--t-enter) var(--ease);
+}
+
+.route-error[data-stale] {
+  opacity: 0.5;
+}
+
+/* ---------- model notes ---------- */
+
+.route-notes {
+  font-size: var(--fs-12);
+  color: var(--c-text-3);
+}
+
+.route-notes__summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: 32px;
+  padding-right: var(--s-2);
+  border-radius: var(--r-control);
+  list-style: none;
+  cursor: pointer;
+  color: var(--c-text-2);
+}
+
+.route-notes__summary::-webkit-details-marker {
+  display: none;
+}
+
+.route-notes__summary:hover {
+  color: var(--c-text);
+}
+
+.route-notes__chevron {
+  transition: transform var(--t-fast) var(--ease);
+}
+
+.route-notes[open] .route-notes__chevron {
+  transform: rotate(90deg);
+}
+
+.route-notes__count {
+  color: var(--c-text-3);
+}
+
+.route-notes__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0 0 0 var(--s-5);
 }
 
 /* ---------- A* vs Dijkstra ---------- */
