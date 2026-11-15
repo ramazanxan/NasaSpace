@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>MarsNavigator — материалы для жюри</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  :root { --ink:#1b1d21; --muted:#5d6168; --line:#d9d6d0; --accent:#2f6f99; --rust:#a4532f; --soft:#f4f1ec; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: var(--ink); font-size: 10.4pt; line-height: 1.45; margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 2mm; letter-spacing: -0.01em; }
+  h2 { font-size: 13.5pt; margin: 7mm 0 2.5mm; padding-bottom: 1.5mm; border-bottom: 1.5px solid var(--ink); }
+  h3 { font-size: 11pt; margin: 4mm 0 1.5mm; }
+  p { margin: 0 0 2mm; }
+  ul, ol { margin: 0 0 2mm; padding-left: 5mm; }
+  li { margin: 0 0 1mm; }
+  .lead { font-size: 11.5pt; color: var(--muted); margin-bottom: 4mm; }
+  .tag { display:inline-block; font-size: 8.5pt; color: var(--muted); border:1px solid var(--line); border-radius: 3mm; padding: 0.5mm 2.5mm; margin-right: 1.5mm; }
+  table { width: 100%; border-collapse: collapse; margin: 1.5mm 0 3mm; font-size: 9.4pt; }
+  th, td { text-align: left; vertical-align: top; padding: 1.6mm 2mm; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; background: var(--soft); }
+  code, .mono { font-family: Consolas, "Courier New", monospace; font-size: 9pt; }
+  .formula { background: var(--soft); border-left: 3px solid var(--accent); padding: 2.5mm 3.5mm; margin: 2mm 0 3mm; font-family: Consolas, monospace; font-size: 9.3pt; }
+  .note { border-left: 3px solid var(--rust); padding: 1.5mm 3.5mm; color: #3a3d42; background: #fbf4ef; margin: 2mm 0 3mm; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .box { border: 1px solid var(--line); border-radius: 2mm; padding: 3mm 4mm; }
+  .t { font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .speech td:first-child { width: 22mm; }
+  .speech td { font-size: 9.6pt; }
+  .q { font-weight: 600; margin-top: 2.5mm; }
+  .page { page-break-before: always; }
+  .links td:first-child { width: 38mm; color: var(--muted); }
+  .small { font-size: 9pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>MarsNavigator</h1>
+<p class="lead">3D-планировщик безопасных маршрутов для ровера и астронавта по Марсу. Все данные взяты с NASA Mars Trek (trek.nasa.gov).</p>
+<p><span class="tag">React + CesiumJS</span><span class="tag">Java 21 + Spring Boot</span><span class="tag">A* и Дейкстра</span><span class="tag">NASA Mars Trek</span><span class="tag">Render + Vercel</span></p>
+
+<h2>1. Задача и решение в одном абзаце</h2>
+<p>Чтобы безопасно проложить путь по Марсу, мало знать рельеф: важны крутизна склонов, слой пыли (в ней вязнут колёса, она забивает скафандры), тип грунта и температура в момент выхода. Мы собрали эти показатели из слоёв NASA Mars Trek в одну модель проходимости на гексагональной сетке и прокладываем по ней маршрут алгоритмом A*. Всё показывается на интерактивном 3D-глобусе Марса: маршрут, профиль высот, слои анализа, вид от первого лица.</p>
+
+<h2>2. Какие данные использованы и зачем</h2>
+<table>
+  <tr><th style="width:30%">Слой Mars Trek</th><th style="width:30%">Что показывает</th><th>Как мы его используем</th></tr>
+  <tr><td><b>MGS MOLA Global DEM</b><br><span class="small">mola128_mola64_merge…</span></td><td>Высота поверхности относительно ареоида</td><td>Настоящий 3D-рельеф глобуса; высота каждой ячейки; штраф за подъём и спуск в маршруте; профиль высот</td></tr>
+  <tr><td><b>Сетка уклонов</b> (grid.geojson, наша команда)</td><td>Средний уклон и его разброс (σ) в каждой ячейке</td><td>Главный критерий: ячейка закрыта, если уклон + 2σ больше предела профиля</td></tr>
+  <tr><td><b>MGS TES Global Dust Index</b><br><span class="small">tes_ruffdust</span></td><td>Насколько поверхность покрыта мелкой пылью</td><td>Штраф за пыль; для астронавта пыль выше 0,70 означает запрет прохода</td></tr>
+  <tr><td><b>MGS TES Global Thermal Inertia</b></td><td>Как быстро грунт нагревается и остывает</td><td>Низкая инерция означает рыхлый песок и пыль (штраф). Отсюда же модель температуры поверхности по времени суток</td></tr>
+  <tr><td><b>Viking MDIM 2.1 Colour Mosaic</b></td><td>Цветной снимок всего Марса, 232 м/пикс</td><td>Базовая карта «Natural»</td></tr>
+  <tr><td><b>MRO CTX Mosaic</b></td><td>Чёрно-белые снимки около 5 м/пикс</td><td>Детализация при приближении</td></tr>
+  <tr><td><b>MOLA + HRSC Hillshade / Colour Hillshade</b></td><td>Светотень рельефа; цвет по высоте</td><td>Объём гор и кратеров; режим «Elevation»</td></tr>
+</table>
+<p class="small">Названия мест и посадочных площадок взяты из справочников IAU и NASA. Положение Солнца рассчитывается по формулам Allison &amp; McEwen (2000).</p>
+
+<h3>Как данные Trek попадают в модель</h3>
+<ol>
+  <li><b>Сетка:</b> 37 648 гексагонов размером около 1° (порядка 59 км), покрывающих западное полушарие. Уклон в каждой ячейке посчитан нашей командой.</li>
+  <li><b>Импорт (Java, <code>TrekLayerImporter</code>):</b> бэкенд скачивает тайлы Trek: MOLA (98 тайлов на три слоя), TES-инерцию и TES-пыль. Для каждой ячейки он усредняет пиксели внутри неё и сохраняет результат в <code>trek_layers.csv</code>, так что при запуске интернет не нужен.</li>
+  <li><b>Перевод картинки в число:</b> высоту MOLA читаем по яркости серого тайла (линейно от −8 201 до +21 229 м). Пыль и инерцию переводим из цвета по оттенку радуги: фиолетовый означает минимум, красный максимум. Серые и прозрачные пиксели считаем отсутствием данных.</li>
+  <li><b>Проверка правдоподобия:</b> самая высокая ячейка находится на вершине Олимпа (21 229 м), Фарсида получается одной из самых пыльных областей (индекс около 0,9), дно долин Маринер лежит низко.</li>
+</ol>
+
+<h2 class="page">3. Модель проходимости</h2>
+<h3>Профили движения</h3>
+<table>
+  <tr><th>Профиль</th><th>Предельный уклон</th><th>Пыль</th><th>Мин. температура грунта</th><th>Скорость</th></tr>
+  <tr><td><b>Ровер</b></td><td>15° (уклон + 2σ)</td><td>не запрещает, даёт штраф</td><td>−95 °C</td><td>150 м за сол</td></tr>
+  <tr><td><b>Астронавт</b></td><td>25° (уклон + 2σ)</td><td>запрет при индексе выше 0,70</td><td>−80 °C</td><td>6 км за сол</td></tr>
+</table>
+
+<h3>Стоимость перехода в соседнюю ячейку</h3>
+<div class="formula">цена = длина по сфере Марса × f<br>
+f = 1 + A·(подъём/θmax)² + B·(спуск/θmax)² + λ·σ/θmax + Wпыль·пыль² + Wгрунт·рыхлость + Wхолод·холод</div>
+<ul>
+  <li><b>Подъём и спуск</b> считаются по разнице высот MOLA между ячейками. Подъём штрафуется сильнее спуска.</li>
+  <li><b>σ уклона:</b> неровная местность дороже, даже если средний уклон невелик.</li>
+  <li><b>Рыхлость</b> берётся из тепловой инерции TES: чем меньше инерция, тем больше песка и пыли.</li>
+  <li><b>Ячейка закрыта</b>, если уклон + 2σ выше предела, пыль выше лимита (для астронавта), грунт холоднее минимума в час выхода или для ячейки нет данных.</li>
+</ul>
+
+<h3>Температура поверхности (упрощённая модель)</h3>
+<div class="formula">T(час) = 215 K − 50 K·sin²(широта) + (20 K + 60 K·(1 − инерция)) · cos(2π·(час − 13)/24)</div>
+<p>Рыхлый грунт с низкой инерцией днём быстро нагревается, а ночью сильно остывает. Поэтому <b>маршрут зависит от времени выхода</b>: ночью часть участков закрывается, днём открывается.</p>
+<div class="note">Это модель, а не прямое измерение. Числа пыли и инерции получены пересчётом цветов карт Trek, потому что Trek не публикует числовые легенды к этим тайлам. На защите об этом лучше сказать прямо.</div>
+
+<h3>Алгоритм</h3>
+<ul>
+  <li><b>A*</b> по графу гексагонов, у каждой ячейки 6 соседей. Эвристика — расстояние до цели по дуге большого круга. Она никогда не завышает реальную цену (множитель f ≥ 1), поэтому A* гарантированно находит оптимальный путь.</li>
+  <li><b>Дейкстра</b> — тот же поиск без эвристики. В приложении есть кнопка сравнения: оба алгоритма находят одинаковый путь, но A* проверяет заметно меньше ячеек, и это видно анимацией на карте.</li>
+  <li><b>Пример:</b> ровер, от Фарсиды (110° з. д., 20° с. ш.) до долин Маринер (60° з. д., 5° ю. ш.): 3 857 км, A* раскрыл 4 497 ячеек. Астронавт, от Viking 1 до Mars Pathfinder: 950 км.</li>
+  <li><b>Ближайшая открытая точка:</b> если старт или финиш попал в закрытую зону, поиск в ширину по соседям находит ближайшую ячейку, доступную этому профилю.</li>
+</ul>
+
+<h2>4. Что умеет приложение</h2>
+<div class="grid2">
+  <div class="box">
+    <ul>
+      <li>3D-глобус Марса с настоящим рельефом MOLA, рельеф можно усилить до 10×</li>
+      <li>Переключатель «Natural» (обычный Марс) / «Elevation» (цвет по высоте)</li>
+      <li>Поиск мест и посадочных площадок; карточка любой точки с её высотой, уклоном, пылью, инерцией, температурой и проходимостью для обоих профилей</li>
+      <li>Маршрут A → B для ровера или астронавта; понятная причина, если пути нет; кнопка «перенести на открытую землю»</li>
+    </ul>
+  </div>
+  <div class="box">
+    <ul>
+      <li>Статистика маршрута: длина, набор высоты, максимальный уклон, время в солах, пыль, температура, риск; профиль высот, пыли и температуры по пути</li>
+      <li>Слои Trek (пыль, тепловая инерция) и слои анализа бэкенда с легендами</li>
+      <li>Слайдер сола и времени суток: положение Солнца и влияние часа выхода на маршрут</li>
+      <li>Вид от первого лица по маршруту; свободная прогулка с WASD, где алгоритм не пускает в закрытые зоны</li>
+    </ul>
+  </div>
+</div>
+
+<h2 class="page">5. Технологии</h2>
+<table>
+  <tr><th style="width:24%">Часть</th><th>Технологии</th></tr>
+  <tr><td><b>Фронтенд</b></td><td>React 19, TypeScript, Vite; <b>CesiumJS</b> с эллипсоидом Марса (рельеф из тайлов MOLA, снимки Trek); Zustand (состояние); Recharts (графики); lucide (иконки)</td></tr>
+  <tr><td><b>Бэкенд</b></td><td><b>Java 21, Spring Boot 4</b>, без базы данных: сетка и слои хранятся в памяти. REST API: <code>/routes/plan</code>, <code>/cells/at</code>, <code>/cells/nearest-open</code>, <code>/layers</code>, <code>/grid/info</code>. Слои анализа рисуются на сервере в PNG</td></tr>
+  <tr><td><b>Инфраструктура</b></td><td>GitHub (код, PR, CI сборка), Docker, Render (бэкенд), Vercel (фронтенд)</td></tr>
+  <tr><td><b>Безопасность</b></td><td>Проверка входных данных, лимит параллельных поисков, ограничение размера запросов, CORS, заголовки безопасности; npm audit — 0 уязвимостей</td></tr>
+</table>
+
+<h2>6. Речь на 5 минут (English)</h2>
+<table class="speech">
+  <tr><td class="t">0:00–0:30</td><td><b>Problem.</b> “Planning a traverse on Mars is not just about the shortest line. Steep slopes stop a rover, thick dust clogs suits and wheels, loose sand traps you, and ground temperature changes by the hour. Mission planners need all of this in one place.”</td></tr>
+  <tr><td class="t">0:30–1:15</td><td><b>Data.</b> “Everything comes from NASA Mars Trek: MOLA elevation, TES dust index, TES thermal inertia, plus slope statistics on our hex grid of 37,648 cells. Our Java backend samples the Trek tiles and turns them into one traversability model.” <i>(show the Natural / Elevation switch and the dust layer)</i></td></tr>
+  <tr><td class="t">1:15–2:15</td><td><b>Model and algorithm.</b> “Each step costs distance times a factor for climbing, roughness, dust, loose ground and cold. Two profiles: a rover up to 15°, an astronaut up to 25° who cannot enter heavy dust. We search with A* using great-circle distance as the heuristic, so the route is optimal, and we can compare it with Dijkstra.” <i>(click Compare A* and Dijkstra)</i></td></tr>
+  <tr><td class="t">2:15–3:30</td><td><b>Live demo.</b> “From Viking 1 to Mars Pathfinder as an astronaut: 950 km. Here is the elevation, dust and temperature along the way. Change the departure hour, and the route changes, because loose ground gets too cold at night. Now Olympus Mons as an astronaut: blocked by dust. One click moves the point to the nearest open ground.”</td></tr>
+  <tr><td class="t">3:30–4:20</td><td><b>First person.</b> “Drive the route in first person on the real relief, or walk freely with WASD: the same model stops you before closed ground and tells you why.”</td></tr>
+  <tr><td class="t">4:20–5:00</td><td><b>Close.</b> “React and CesiumJS on the front, Java Spring Boot on the back, all open NASA data. Next steps: the eastern hemisphere grid, finer cells near landing sites, and calibrated dust and temperature values.”</td></tr>
+</table>
+
+<h2 class="page">7. Возможные вопросы жюри и ответы</h2>
+<p class="q">Откуда данные? Это реальные измерения?</p>
+<p>Все слои взяты с NASA Mars Trek: высоты MOLA, пыль и тепловая инерция с прибора TES, снимки Viking и CTX. Уклоны посчитала наша команда по сетке. Пыль и инерцию мы переводим из цвета тайлов в числа, поэтому относительный порядок величин точный, а абсолютные значения приблизительные.</p>
+<p class="q">Почему A*, а не просто Дейкстра?</p>
+<p>A* находит тот же оптимальный путь, но проверяет меньше ячеек, потому что эвристика ведёт поиск к цели. Эвристика допустима: расстояние по дуге не превышает реальную цену, так как множитель стоимости не меньше 1. В приложении это видно кнопкой сравнения.</p>
+<p class="q">Почему астронавт не может пройти по Олимпу?</p>
+<p>По данным TES индекс пыли на Фарсиде и Олимпе около 0,85–0,94, а предел для астронавта 0,70: толстая пыль забивает скафандр и оборудование. Ровер проходит, но со штрафом. Кнопка «Move to nearest open ground» находит ближайшую доступную точку.</p>
+<p class="q">Как учитывается время суток?</p>
+<p>Через упрощённую модель температуры поверхности на основе тепловой инерции: рыхлый грунт ночью сильно остывает. Если температура ниже предела профиля, ячейка в этот час закрыта. Поэтому одинаковые точки при разном часе выхода дают разный маршрут.</p>
+<p class="q">Какая точность? Почему ячейки такие крупные?</p>
+<p>Сетка около 1° (порядка 59 км) — это стратегический уровень, планирование на сотни километров. Для точного подхода к месту посадки ту же модель можно запустить на мелкой сетке: код от размера ячейки не зависит.</p>
+<p class="q">Почему только западное полушарие?</p>
+<p>Наша сетка уклонов пока покрывает долготы от −180° до 0°. Карта и слои Trek работают на всей планете, маршруты появятся там, как только будет готова вторая половина сетки.</p>
+<p class="q">Чем вы лучше простого просмотра Mars Trek?</p>
+<p>Trek показывает слои по отдельности. Мы объединяем их в одну модель проходимости с учётом профиля и времени, строим оптимальный маршрут, объясняем, почему он такой, и даём пройти его в 3D.</p>
+<p class="q">Что дальше?</p>
+<p>Восточное полушарие и мелкая сетка, калиброванные значения пыли и температуры, учёт камней и радиации (в модели уже есть места под эти показатели), экспорт маршрута в GeoJSON.</p>
+
+<h2>8. Ссылки</h2>
+<table class="links">
+  <tr><td>Код</td><td>github.com/ramazanxan/NasaSpace</td></tr>
+  <tr><td>Бэкенд (Render)</td><td>nasaspace-k3vz.onrender.com/api/v1/grid/info</td></tr>
+  <tr><td>Фронтенд (Vercel)</td><td>после деплоя: ссылка вида marsnavigator.vercel.app</td></tr>
+  <tr><td>Данные</td><td>trek.nasa.gov/mars</td></tr>
+</table>
+<p class="small">Совет: за минуту до выступления откройте сайт. Бесплатный Render засыпает без посетителей, и первый запрос после этого ждёт около 50 секунд.</p>
+
+</body>
+</html>
