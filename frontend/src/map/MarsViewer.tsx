@@ -5,6 +5,7 @@ import {
   Color,
   Ellipsoid,
   ImageryLayer,
+  RequestScheduler,
   Math as CMath,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
@@ -23,12 +24,16 @@ import { emitClick, emitMove, hasMoveHandlers, onMapClick, setViewer, useViewer,
 
 // Must be set before any Cesium object is created: every default ellipsoid becomes Mars.
 Ellipsoid.default = Ellipsoid.MARS
+// Trek serves every layer from one host; let more tiles load in parallel so moving views fill in fast.
+RequestScheduler.requestsByServer['trek.nasa.gov:443'] = 36
+RequestScheduler.requestsByServer['astro.arcgis.com:443'] = 24
 
 /** The imagery layers the base-map switch controls. */
 interface BaseLayers {
   viking: ImageryLayer
   ctx: ImageryLayer
   tint: ImageryLayer
+  shade: ImageryLayer
   elevation: ImageryLayer
 }
 
@@ -43,11 +48,14 @@ function addBaseLayers(viewer: Viewer): BaseLayers {
   const viking = layers.get(0)
   const ctx = new ImageryLayer(trekProvider('ctx'), { minimumTerrainLevel: 6, brightness: 1.05, contrast: 1.1 })
   const tint = new ImageryLayer(trekProvider('viking'), { minimumTerrainLevel: 6, alpha: 0.5 })
+  // Hillshade on top at low strength: craters, ridges and canyon walls get light and shadow.
+  const shade = new ImageryLayer(trekProvider('shade'), { alpha: 0.38, contrast: 1.15 })
   const elevation = new ImageryLayer(trekProvider('elevation'), { show: false })
   layers.add(ctx)
   layers.add(tint)
+  layers.add(shade)
   layers.add(elevation)
-  return { viking, ctx, tint, elevation }
+  return { viking, ctx, tint, shade, elevation }
 }
 
 function pointerEvent(viewer: Viewer, pos: Cartesian2): MapPointerEvent {
@@ -100,6 +108,8 @@ export function MarsViewer() {
     scene.globe.enableLighting = false
     scene.globe.depthTestAgainstTerrain = true
     scene.globe.maximumScreenSpaceError = 1.5
+    scene.globe.tileCacheSize = 400
+    scene.globe.preloadSiblings = true
     if (scene.skyAtmosphere) {
       // Thin, dusty limb instead of Earth's blue halo.
       scene.skyAtmosphere.hueShift = -0.62
@@ -166,6 +176,7 @@ export function MarsViewer() {
     b.viking.show = natural
     b.ctx.show = natural
     b.tint.show = natural
+    b.shade.show = natural
     b.elevation.show = !natural
     viewer.scene.requestRender()
   }, [viewer, basemap])

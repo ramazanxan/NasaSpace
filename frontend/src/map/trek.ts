@@ -35,6 +35,13 @@ export const TREK_LAYERS = {
     maximumLevel: 8,
     credit: 'NASA/GSFC/DLR/FU Berlin · MOLA + HRSC colour hillshade blend, via Mars Trek',
   },
+  /** Grey hillshade of the same DEM: laid lightly over the colour mosaic to give relief its volume. */
+  shade: {
+    title: 'MGS MOLA and Mars Express HRSC, hillshade blend',
+    url: tiles('Mars_MOLA_blend200ppx_HRSC_Shade_clon0dd_200mpp_lzw', 'jpg'),
+    maximumLevel: 8,
+    credit: 'NASA/GSFC/DLR/FU Berlin · MOLA + HRSC hillshade blend, via Mars Trek',
+  },
   /** Greyscale close-up detail, about 5 m/px, 512 px tiles. */
   ctx: {
     title: 'MRO CTX mosaic',

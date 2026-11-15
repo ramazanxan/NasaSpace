@@ -128,9 +128,20 @@ function Drive({ cells, mode: travelMode }: { cells: RouteCell[]; mode: TravelMo
       up: camera.up.clone(),
       requestRenderMode: scene.requestRenderMode,
       inputs: scene.screenSpaceCameraController.enableInputs,
+      background: scene.backgroundColor.clone(),
+      fog: { enabled: scene.fog.enabled, density: scene.fog.density, sse: scene.fog.screenSpaceErrorFactor },
+      sse: scene.globe.maximumScreenSpaceError,
+      groundAtmosphere: scene.globe.showGroundAtmosphere,
     }
     scene.requestRenderMode = false
     scene.screenSpaceCameraController.enableInputs = false
+    // Martian daytime sky: butterscotch near the horizon, with haze that softens distant ground.
+    scene.backgroundColor = Color.fromCssColorString('#b98b67')
+    scene.fog.enabled = true
+    scene.fog.density = 1.2e-4
+    scene.fog.screenSpaceErrorFactor = 4
+    scene.globe.showGroundAtmosphere = true
+    scene.globe.maximumScreenSpaceError = 2.2
     document.body.classList.add('fpv-on')
 
     const goal = cells[cells.length - 1]
@@ -138,22 +149,35 @@ function Drive({ cells, mode: travelMode }: { cells: RouteCell[]; mode: TravelMo
     const ink = Color.fromCssColorString('#14161a')
     const x = useApp.getState().exaggeration
     const goalH = (goal.elevationM ?? 0) * x
+    const beaconLen = 18_000 + 3_000 * x
     const entities: Entity[] = [
       viewer.entities.add({
         id: 'fpv:beacon',
-        polyline: {
-          positions: [
-            Cartesian3.fromDegrees(goal.lon, goal.lat, goalH, MARS),
-            Cartesian3.fromDegrees(goal.lon, goal.lat, goalH + 45_000 + 6_000 * x, MARS),
-          ],
-          width: 4,
-          material: accent,
-          depthFailMaterial: accent.withAlpha(0.6),
+        position: Cartesian3.fromDegrees(goal.lon, goal.lat, goalH + beaconLen / 2, MARS),
+        cylinder: {
+          length: beaconLen,
+          topRadius: 900,
+          bottomRadius: 2_600,
+          material: accent.withAlpha(0.55),
+          outline: false,
+        },
+      }),
+      viewer.entities.add({
+        id: 'fpv:ring',
+        position: Cartesian3.fromDegrees(goal.lon, goal.lat, goalH + 200, MARS),
+        ellipse: {
+          semiMajorAxis: 14_000,
+          semiMinorAxis: 14_000,
+          height: goalH + 200,
+          material: accent.withAlpha(0.18),
+          outline: true,
+          outlineColor: accent,
+          outlineWidth: 2,
         },
       }),
       viewer.entities.add({
         id: 'fpv:goal',
-        position: Cartesian3.fromDegrees(goal.lon, goal.lat, goalH + 45_000 + 6_000 * x, MARS),
+        position: Cartesian3.fromDegrees(goal.lon, goal.lat, goalH + beaconLen + 2_000, MARS),
         label: {
           text: 'Goal',
           font: '600 14px "Geologica", system-ui, sans-serif',
@@ -171,10 +195,10 @@ function Drive({ cells, mode: travelMode }: { cells: RouteCell[]; mode: TravelMo
         id: 'fpv:vehicle',
         position: Cartesian3.fromDegrees(cells[0].lon, cells[0].lat, 0, MARS),
         point: {
-          pixelSize: 12,
-          color: accent,
-          outlineColor: ink,
-          outlineWidth: 3,
+          pixelSize: 14,
+          color: Color.WHITE,
+          outlineColor: accent,
+          outlineWidth: 4,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
       }),
@@ -186,6 +210,12 @@ function Drive({ cells, mode: travelMode }: { cells: RouteCell[]; mode: TravelMo
       if (viewer.isDestroyed()) return
       entities.forEach((e) => viewer.entities.remove(e))
       scene.screenSpaceCameraController.enableInputs = saved.inputs
+      scene.backgroundColor = saved.background
+      scene.fog.enabled = saved.fog.enabled
+      scene.fog.density = saved.fog.density
+      scene.fog.screenSpaceErrorFactor = saved.fog.sse
+      scene.globe.maximumScreenSpaceError = saved.sse
+      scene.globe.showGroundAtmosphere = saved.groundAtmosphere
       camera.setView({ destination: saved.position, orientation: { direction: saved.direction, up: saved.up } })
       scene.requestRenderMode = saved.requestRenderMode
       scene.requestRender()
