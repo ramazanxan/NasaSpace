@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import {
+  ArcType,
   Cartesian2,
   Cartesian3,
   Cartographic,
@@ -124,6 +125,25 @@ function useMarkers(viewer: Viewer | null) {
   }, [viewer, from, to])
 }
 
+/** Points every ~8 km between cell centres, with linearly interpolated elevation, so the line follows the curve of the planet. */
+function densify(cells: { lon: number; lat: number; elevationM?: number | null }[]): (LonLat & { h: number })[] {
+  const out: (LonLat & { h: number })[] = []
+  for (let k = 0; k < cells.length; k++) {
+    const a = cells[k]
+    const ha = a.elevationM ?? 0
+    out.push({ lon: a.lon, lat: a.lat, h: ha })
+    const b = cells[k + 1]
+    if (!b) break
+    const hb = b.elevationM ?? ha
+    const steps = Math.min(16, Math.max(1, Math.round(Math.hypot(b.lon - a.lon, b.lat - a.lat) / 0.14)))
+    for (let t = 1; t < steps; t++) {
+      const f = t / steps
+      out.push({ lon: a.lon + (b.lon - a.lon) * f, lat: a.lat + (b.lat - a.lat) * f, h: ha + (hb - ha) * f })
+    }
+  }
+  return out
+}
+
 function useRouteLine(viewer: Viewer | null) {
   const plan = useApp((s) => s.plan)
   const status = useApp((s) => s.routeStatus)
@@ -131,50 +151,65 @@ function useRouteLine(viewer: Viewer | null) {
   const to = useApp((s) => s.to)
   const framed = useRef<string | null>(null)
 
+  const exaggeration = useApp((s) => s.exaggeration)
+
   useEffect(() => {
     if (!viewer) return
     const c = palette()
     const added: Entity[] = []
     const cells = status === 'error' ? null : routeCells(plan)
     const stale = status === 'loading'
+    // Lines float just above the exaggerated MOLA surface instead of being draped on it:
+    // draped lines break up on steep relief. Where a ridge still hides a stretch,
+    // the depth-fail material keeps it visible, slightly dimmed.
+    const lift = 1500 * exaggeration
+    const raised = (p: LonLat, h: number | null | undefined) => at(p, (h ?? 0) * exaggeration + lift)
     if (cells) {
-      const positions = cells.map((p) => at(p))
+      const positions = densify(cells).map((p) => raised(p, p.h))
+      const line = (id: string, width: number, color: Color) =>
+        viewer.entities.add({
+          id,
+          polyline: {
+            positions,
+            width,
+            material: color,
+            depthFailMaterial: color.withAlpha(color.alpha * 0.55),
+            arcType: ArcType.NONE,
+          },
+        })
       added.push(
-        viewer.entities.add({
-          id: 'route:underlay',
-          polyline: { positions, width: 7, material: c.ground.withAlpha(stale ? 0.3 : 0.7), clampToGround: true, zIndex: 0 },
-        }),
-        viewer.entities.add({
-          id: 'route:line',
-          polyline: { positions, width: 4, material: c.accent.withAlpha(stale ? 0.45 : 1), clampToGround: true, zIndex: 1 },
-        }),
+        line('route:underlay', 10, c.ground.withAlpha(stale ? 0.3 : 0.85)),
+        line('route:line', 5, c.accent.withAlpha(stale ? 0.5 : 1)),
       )
-      // HIGH-risk stretches: a thin rust line on top, from the midpoint before the run to the midpoint after it.
-      const mid = (a: RouteCell, b: RouteCell) => at({ lon: (a.lon + b.lon) / 2, lat: (a.lat + b.lat) / 2 })
       highRiskRuns(cells).forEach(([i, j], k) => {
-        const pts: Cartesian3[] = []
-        if (i > 0) pts.push(mid(cells[i - 1], cells[i]))
-        for (let n = i; n <= j; n++) pts.push(at(cells[n]))
-        if (j < cells.length - 1) pts.push(mid(cells[j], cells[j + 1]))
-        if (pts.length < 2) return
+        const run = densify(cells.slice(Math.max(0, i - 1), Math.min(cells.length, j + 2)))
+        if (run.length < 2) return
+        const color = c.rust.withAlpha(stale ? 0.4 : 0.95)
         added.push(
           viewer.entities.add({
             id: `route:risk:${k}`,
-            polyline: { positions: pts, width: 2, material: c.rust.withAlpha(stale ? 0.4 : 0.95), clampToGround: true, zIndex: 2 },
+            polyline: {
+              positions: run.map((p) => raised(p, p.h + 60)),
+              width: 2.5,
+              material: color,
+              depthFailMaterial: color.withAlpha(0.5),
+              arcType: ArcType.NONE,
+            },
           }),
         )
       })
     } else if (from && to) {
-      // No route yet (or none possible): a faint straight hint between the points.
+      // No route yet (or none possible): a straight hint between the points, high enough to clear the relief.
+      const color = c.text.withAlpha(0.85)
       added.push(
         viewer.entities.add({
           id: 'route:draft',
           polyline: {
-            positions: [at(from), at(to)],
-            width: 1.5,
-            material: new PolylineDashMaterialProperty({ color: c.text.withAlpha(0.6), dashLength: 12 }),
-            clampToGround: true,
-            zIndex: 0,
+            positions: [at(from, lift * 4), at(to, lift * 4)],
+            width: 2.5,
+            arcType: ArcType.GEODESIC,
+            material: new PolylineDashMaterialProperty({ color, gapColor: c.ground.withAlpha(0.6), dashLength: 16 }),
+            depthFailMaterial: new PolylineDashMaterialProperty({ color: color.withAlpha(0.45), dashLength: 16 }),
           },
         }),
       )
@@ -185,7 +220,7 @@ function useRouteLine(viewer: Viewer | null) {
       added.forEach((e) => viewer.entities.remove(e))
       viewer.scene.requestRender()
     }
-  }, [viewer, plan, status, from, to])
+  }, [viewer, plan, status, from, to, exaggeration])
 
   // Frame a route with new end cells or mode; a new departure hour alone keeps the view.
   useEffect(() => {
