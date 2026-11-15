@@ -1,4 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
+/** The first-person view is not built yet; flip this on when src/fpv/ is done. */
+const FPV_READY = false
+
 import { ArrowUpDown, ChevronRight, Crosshair, Footprints, Navigation, RotateCcw, Truck, X } from 'lucide-react'
 import type { LonLat, RiskLevel, RoutePlan, TravelMode } from '../api/types'
 import { formatCoord } from '../map/geo'
@@ -254,7 +257,7 @@ export function RoutePanel() {
           {plan && status !== 'error' && plan.status === 'OK' && (
             <>
               <RouteStats plan={plan} stale={loading} />
-              {cells.length > 1 && (
+              {FPV_READY && cells.length > 1 && (
                 <Button
                   variant="secondary"
                   className="route-fpv"
