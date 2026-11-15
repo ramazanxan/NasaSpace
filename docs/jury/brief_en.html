@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MarsNavigator — jury brief</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+  :root { --ink:#1b1d21; --muted:#5d6168; --line:#d9d6d0; --accent:#2f6f99; --rust:#a4532f; --soft:#f4f1ec; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: var(--ink); font-size: 10.4pt; line-height: 1.45; margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 2mm; letter-spacing: -0.01em; }
+  h2 { font-size: 13.5pt; margin: 7mm 0 2.5mm; padding-bottom: 1.5mm; border-bottom: 1.5px solid var(--ink); }
+  h3 { font-size: 11pt; margin: 4mm 0 1.5mm; }
+  p { margin: 0 0 2mm; }
+  ul, ol { margin: 0 0 2mm; padding-left: 5mm; }
+  li { margin: 0 0 1mm; }
+  .lead { font-size: 11.5pt; color: var(--muted); margin-bottom: 4mm; }
+  .tag { display:inline-block; font-size: 8.5pt; color: var(--muted); border:1px solid var(--line); border-radius: 3mm; padding: 0.5mm 2.5mm; margin-right: 1.5mm; }
+  table { width: 100%; border-collapse: collapse; margin: 1.5mm 0 3mm; font-size: 9.4pt; }
+  th, td { text-align: left; vertical-align: top; padding: 1.6mm 2mm; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; background: var(--soft); }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; }
+  .formula { background: var(--soft); border-left: 3px solid var(--accent); padding: 2.5mm 3.5mm; margin: 2mm 0 3mm; font-family: Consolas, monospace; font-size: 9.3pt; }
+  .note { border-left: 3px solid var(--rust); padding: 1.5mm 3.5mm; color: #3a3d42; background: #fbf4ef; margin: 2mm 0 3mm; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .box { border: 1px solid var(--line); border-radius: 2mm; padding: 3mm 4mm; }
+  .t { font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .speech td:first-child { width: 22mm; }
+  .speech td { font-size: 9.6pt; }
+  .q { font-weight: 600; margin-top: 2.5mm; }
+  .page { page-break-before: always; }
+  .links td:first-child { width: 38mm; color: var(--muted); }
+  .small { font-size: 9pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>MarsNavigator</h1>
+<p class="lead">A 3D planner for safe rover and astronaut routes across Mars. Every data value comes from NASA Mars Trek (trek.nasa.gov).</p>
+<p><span class="tag">React + CesiumJS</span><span class="tag">Java 21 + Spring Boot</span><span class="tag">A* and Dijkstra</span><span class="tag">NASA Mars Trek</span><span class="tag">Render + Vercel</span></p>
+
+<h2>1. Problem and solution in one paragraph</h2>
+<p>A safe path across Mars depends on more than relief: steep slopes stop a rover, thick dust clogs wheels and suits, loose ground traps you, and surface temperature changes with the hour of departure. We merged these indicators from NASA Mars Trek layers into a single traversability model on a hexagonal grid and route across it with A*. The result is shown on an interactive 3D globe of Mars: the route, its elevation profile, analysis layers and a first-person view.</p>
+
+<h2>2. Data used and why</h2>
+<table>
+  <tr><th style="width:30%">Mars Trek layer</th><th style="width:30%">What it shows</th><th>How we use it</th></tr>
+  <tr><td><b>MGS MOLA Global DEM</b><br><span class="small">mola128_mola64_merge…</span></td><td>Surface height above the areoid</td><td>Real 3D relief of the globe; elevation of every cell; climb and descent penalties; elevation profile</td></tr>
+  <tr><td><b>Slope grid</b> (grid.geojson, our team)</td><td>Mean slope and its spread (σ) per cell</td><td>Main criterion: a cell is closed when slope + 2σ exceeds the profile limit</td></tr>
+  <tr><td><b>MGS TES Global Dust Index</b><br><span class="small">tes_ruffdust</span></td><td>How much fine dust covers the surface</td><td>Dust penalty; for astronauts, dust above 0.70 closes the cell</td></tr>
+  <tr><td><b>MGS TES Global Thermal Inertia</b></td><td>How fast the ground heats and cools</td><td>Low inertia means loose sand and dust (penalty); also drives the surface temperature model by hour</td></tr>
+  <tr><td><b>Viking MDIM 2.1 Colour Mosaic</b></td><td>Colour image of all of Mars, 232 m/px</td><td>“Natural” base map</td></tr>
+  <tr><td><b>MRO CTX Mosaic</b></td><td>Greyscale imagery, about 5 m/px</td><td>Detail when zoomed in</td></tr>
+  <tr><td><b>MOLA + HRSC Hillshade / Colour Hillshade</b></td><td>Shaded relief; colour by height</td><td>Volume for mountains and craters; “Elevation” mode</td></tr>
+</table>
+<p class="small">Place names and landing sites come from IAU and NASA references. The Sun’s position uses Allison &amp; McEwen (2000).</p>
+
+<h3>How Trek data gets into the model</h3>
+<ol>
+  <li><b>Grid:</b> 37,648 hexagons of about 1° (roughly 59 km) covering the western hemisphere. Slope per cell was computed by our team.</li>
+  <li><b>Import (Java, <code>TrekLayerImporter</code>):</b> the backend downloads Trek tiles — 98 tiles across MOLA, TES thermal inertia and TES dust — averages the pixels inside each cell, and saves the result to <code>trek_layers.csv</code>, so start-up needs no network.</li>
+  <li><b>Image to number:</b> MOLA height is read from the grey level (linear from −8,201 to +21,229 m). Dust and thermal inertia are read from the rainbow hue: violet is the minimum, red the maximum. Grey and transparent pixels count as no data.</li>
+  <li><b>Sanity check:</b> the highest cell is the summit of Olympus Mons (21,229 m), Tharsis is among the dustiest areas (index about 0.9), and the floor of Valles Marineris lies low.</li>
+</ol>
+
+<h2 class="page">3. Traversability model</h2>
+<h3>Mobility profiles</h3>
+<table>
+  <tr><th>Profile</th><th>Slope limit</th><th>Dust</th><th>Minimum ground temperature</th><th>Speed</th></tr>
+  <tr><td><b>Rover</b></td><td>15° (slope + 2σ)</td><td>never blocks, adds a penalty</td><td>−95 °C</td><td>150 m per sol</td></tr>
+  <tr><td><b>Astronaut</b></td><td>25° (slope + 2σ)</td><td>closed above index 0.70</td><td>−80 °C</td><td>6 km per sol</td></tr>
+</table>
+
+<h3>Cost of a step to a neighbouring cell</h3>
+<div class="formula">cost = great-circle distance on Mars × f<br>
+f = 1 + A·(climb/θmax)² + B·(descent/θmax)² + λ·σ/θmax + Wdust·dust² + Wloose·looseness + Wcold·cold</div>
+<ul>
+  <li><b>Climb and descent</b> come from the MOLA height difference between cells. Climbing is penalised more than descending.</li>
+  <li><b>Slope σ:</b> rough ground costs more even when the mean slope is small.</li>
+  <li><b>Looseness</b> comes from TES thermal inertia: the lower the inertia, the more sand and dust.</li>
+  <li><b>A cell is closed</b> when slope + 2σ is above the limit, dust is above the limit (astronaut), the ground is colder than the minimum at the departure hour, or there is no data.</li>
+</ul>
+
+<h3>Surface temperature (simplified model)</h3>
+<div class="formula">T(hour) = 215 K − 50 K·sin²(latitude) + (20 K + 60 K·(1 − inertia)) · cos(2π·(hour − 13)/24)</div>
+<p>Loose ground with low thermal inertia heats up fast by day and cools hard at night. That is why <b>the route depends on departure time</b>: some cells close at night and open by day.</p>
+<div class="note">This is a model, not a direct measurement. Dust and inertia values are decoded from Trek tile colours, because Trek publishes no numeric legends for those tiles. Say so openly at the defence.</div>
+
+<h3>Algorithm</h3>
+<ul>
+  <li><b>A*</b> over the hex graph, six neighbours per cell. The heuristic is great-circle distance to the goal. It never overestimates the real cost (the factor f ≥ 1), so A* always finds the optimal path.</li>
+  <li><b>Dijkstra</b> is the same search without the heuristic. A compare button in the app shows both find the same path while A* expands noticeably fewer cells, animated on the map.</li>
+  <li><b>Example:</b> rover from Tharsis (110° W, 20° N) to Valles Marineris (60° W, 5° S): 3,857 km, A* expanded 4,497 cells. Astronaut from Viking 1 to Mars Pathfinder: 950 km.</li>
+  <li><b>Nearest open ground:</b> if the start or goal is in a closed area, a breadth-first search over neighbours finds the closest cell open to that profile.</li>
+</ul>
+
+<h2>4. What the app does</h2>
+<div class="grid2">
+  <div class="box">
+    <ul>
+      <li>3D globe of Mars with real MOLA relief, exaggeration up to 10×</li>
+      <li>“Natural” (true colour) and “Elevation” (colour by height) base maps</li>
+      <li>Search for places and landing sites; a card for any point with elevation, slope, dust, thermal inertia, temperature and passability for both profiles</li>
+      <li>Route A → B for rover or astronaut; a clear reason when no route exists; one click to move a point to open ground</li>
+    </ul>
+  </div>
+  <div class="box">
+    <ul>
+      <li>Route stats: length, ascent, max slope, travel time in sols, dust, temperature, risk; profile of elevation, dust and temperature along the way</li>
+      <li>Trek layers (dust, thermal inertia) and backend analysis layers with legends</li>
+      <li>Sol and time-of-day sliders: Sun position and the effect of departure hour on the route</li>
+      <li>First-person drive along the route; free walking with WASD where the model stops you at closed ground</li>
+    </ul>
+  </div>
+</div>
+
+<h2 class="page">5. Technology</h2>
+<table>
+  <tr><th style="width:24%">Part</th><th>Technology</th></tr>
+  <tr><td><b>Frontend</b></td><td>React 19, TypeScript, Vite; <b>CesiumJS</b> with the Mars ellipsoid (relief from MOLA tiles, Trek imagery); Zustand (state); Recharts (charts); lucide (icons)</td></tr>
+  <tr><td><b>Backend</b></td><td><b>Java 21, Spring Boot 4</b>, no database: the grid and layers live in memory. REST API: <code>/routes/plan</code>, <code>/cells/at</code>, <code>/cells/nearest-open</code>, <code>/layers</code>, <code>/grid/info</code>. Analysis layers are rendered to PNG on the server</td></tr>
+  <tr><td><b>Infrastructure</b></td><td>GitHub (code, pull requests, CI build), Docker, Render (backend), Vercel (frontend)</td></tr>
+  <tr><td><b>Security</b></td><td>Input validation, a cap on parallel searches, request size limits, CORS, security headers; npm audit reports 0 vulnerabilities</td></tr>
+</table>
+
+<h2>6. Five-minute talk</h2>
+<table class="speech">
+  <tr><td class="t">0:00–0:30</td><td><b>Problem.</b> “Planning a traverse on Mars is not just about the shortest line. Steep slopes stop a rover, thick dust clogs suits and wheels, loose sand traps you, and ground temperature changes by the hour. Mission planners need all of this in one place.”</td></tr>
+  <tr><td class="t">0:30–1:15</td><td><b>Data.</b> “Everything comes from NASA Mars Trek: MOLA elevation, TES dust index, TES thermal inertia, plus slope statistics on our hex grid of 37,648 cells. Our Java backend samples the Trek tiles and turns them into one traversability model.” <i>(show the Natural / Elevation switch and the dust layer)</i></td></tr>
+  <tr><td class="t">1:15–2:15</td><td><b>Model and algorithm.</b> “Each step costs distance times a factor for climbing, roughness, dust, loose ground and cold. Two profiles: a rover up to 15°, an astronaut up to 25° who cannot enter heavy dust. We search with A* using great-circle distance as the heuristic, so the route is optimal, and we can compare it with Dijkstra.” <i>(click Compare A* and Dijkstra)</i></td></tr>
+  <tr><td class="t">2:15–3:30</td><td><b>Live demo.</b> “From Viking 1 to Mars Pathfinder as an astronaut: 950 km. Here is the elevation, dust and temperature along the way. Change the departure hour, and the route changes, because loose ground gets too cold at night. Now Olympus Mons as an astronaut: blocked by dust. One click moves the point to the nearest open ground.”</td></tr>
+  <tr><td class="t">3:30–4:20</td><td><b>First person.</b> “Drive the route in first person on the real relief, or walk freely with WASD: the same model stops you before closed ground and tells you why.”</td></tr>
+  <tr><td class="t">4:20–5:00</td><td><b>Close.</b> “React and CesiumJS on the front, Java Spring Boot on the back, all open NASA data. Next steps: the eastern hemisphere grid, finer cells near landing sites, and calibrated dust and temperature values.”</td></tr>
+</table>
+
+<h2 class="page">7. Likely jury questions</h2>
+<p class="q">Where does the data come from? Is it real measurement?</p>
+<p>All layers come from NASA Mars Trek: MOLA elevation, dust and thermal inertia from the TES instrument, Viking and CTX imagery. Slopes were computed by our team on the grid. Dust and inertia are decoded from tile colours, so the relative ordering is accurate while absolute values are approximate.</p>
+<p class="q">Why A* and not just Dijkstra?</p>
+<p>A* finds the same optimal path but expands fewer cells, because the heuristic steers the search toward the goal. The heuristic is admissible: great-circle distance never exceeds the real cost, since the cost factor is at least 1. The compare button in the app shows this.</p>
+<p class="q">Why can’t an astronaut cross Olympus Mons?</p>
+<p>TES data puts the dust index on Tharsis and Olympus at about 0.85–0.94, while the astronaut limit is 0.70: thick dust clogs suits and equipment. The rover can pass, with a penalty. “Move to nearest open ground” finds the closest reachable point.</p>
+<p class="q">How does time of day matter?</p>
+<p>Through a simplified surface-temperature model based on thermal inertia: loose ground gets very cold at night. When the temperature falls below the profile limit, that cell is closed at that hour, so the same two points give different routes for different departure times.</p>
+<p class="q">How precise is it? Why are the cells so large?</p>
+<p>A 1° grid (about 59 km) is the strategic level, for planning over hundreds of kilometres. For a precise approach to a landing site the same model runs on a finer grid: the code does not depend on cell size.</p>
+<p class="q">Why only the western hemisphere?</p>
+<p>Our slope grid currently covers longitudes −180° to 0°. The map and Trek layers work on the whole planet; routes there arrive as soon as the second half of the grid is ready.</p>
+<p class="q">How is this better than just viewing Mars Trek?</p>
+<p>Trek shows layers one at a time. We combine them into one traversability model per profile and hour, compute the optimal route, explain why it looks the way it does, and let you travel it in 3D.</p>
+<p class="q">What is next?</p>
+<p>The eastern hemisphere and a finer grid, calibrated dust and temperature values, rocks and radiation (the model already has slots for them), and route export to GeoJSON.</p>
+
+<h2>8. Links</h2>
+<table class="links">
+  <tr><td>Code</td><td>github.com/ramazanxan/NasaSpace</td></tr>
+  <tr><td>Backend (Render)</td><td>nasaspace-k3vz.onrender.com/api/v1/grid/info</td></tr>
+  <tr><td>Frontend (Vercel)</td><td>after deployment: a link like marsnavigator.vercel.app</td></tr>
+  <tr><td>Data</td><td>trek.nasa.gov/mars</td></tr>
+</table>
+<p class="small">Tip: open the site a minute before you present. Free Render instances sleep without visitors, and the first request afterwards takes about 50 seconds.</p>
+
+</body>
+</html>
