@@ -71,6 +71,15 @@ interface AppState {
   fpv: boolean
   setFpv: (v: boolean) => void
 
+  // your own position on Mars and free walking from it
+  me: LonLat | null
+  /** True while the next map click sets your position. */
+  pickMe: boolean
+  walk: boolean
+  setMe: (p: LonLat | null) => void
+  setPickMe: (v: boolean) => void
+  setWalk: (v: boolean) => void
+
   // layers
   trek: Record<TrekOverlayId, OverlayState>
   /** One backend analysis layer at a time, or none. */
@@ -134,7 +143,14 @@ export const useApp = create<AppState>((set) => ({
     set({ from: null, to: null, plan: null, routeStatus: 'idle', routeError: null, hoverIndex: null, pick: null, fpv: false }),
 
   fpv: false,
-  setFpv: (fpv) => set({ fpv }),
+  setFpv: (fpv) => set({ fpv, walk: false }),
+
+  me: null,
+  pickMe: false,
+  walk: false,
+  setMe: (me) => set({ me, pickMe: false }),
+  setPickMe: (pickMe) => set({ pickMe, pick: null }),
+  setWalk: (walk) => set({ walk, fpv: false }),
 
   trek: {
     dust: { visible: false, opacity: 0.6 },

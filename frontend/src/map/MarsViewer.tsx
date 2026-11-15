@@ -155,6 +155,10 @@ export function MarsViewer() {
       onMapClick(({ position, entityId, picking }) => {
         if (picking) return
         const s = useApp.getState()
+        if (s.pickMe) {
+          if (position) s.setMe(position)
+          return
+        }
         if (entityId?.startsWith(PLACE_ENTITY_PREFIX)) {
           const place = PLACES.find((p) => p.id === entityId.slice(PLACE_ENTITY_PREFIX.length))
           if (!place) return

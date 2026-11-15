@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Cartesian3, Color, Ellipsoid, HeightReference } from 'cesium'
-import { Flag, MapPin, X } from 'lucide-react'
+import { Flag, MapPin, X, LocateFixed } from 'lucide-react'
 import { api, ApiError } from '../api/client'
 import type { BlockedBy, CellInfo, LonLat, TravelMode } from '../api/types'
 import { formatCoord } from '../map/geo'
@@ -266,6 +266,13 @@ export function PlaceCard() {
           onClick={() => setPoint('to', position)}
         >
           Route to here
+        </Button>
+        <Button
+          icon={<LocateFixed size={16} strokeWidth={1.5} />}
+          className="place__action"
+          onClick={() => useApp.getState().setMe(position)}
+        >
+          I am here
         </Button>
       </div>
     </article>

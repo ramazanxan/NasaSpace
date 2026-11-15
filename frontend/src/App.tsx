@@ -11,6 +11,8 @@ import { LayersControl } from './layers/LayersControl'
 import { LayersOnMap } from './layers/LayersOnMap'
 import { SolTimeline } from './timeline/SolTimeline'
 import { FirstPersonView } from './fpv/FirstPersonView'
+import { WalkView } from './fpv/WalkView'
+import { LocateControl, MeOnMap } from './fpv/LocateControl'
 import { useBackendBoot } from './store/useBackendBoot'
 
 /**
@@ -38,6 +40,7 @@ export function App() {
       <div className="map-tools">
         <BasemapSwitch />
         <TerrainControls />
+        <LocateControl />
         <LayersControl />
       </div>
 
@@ -47,6 +50,8 @@ export function App() {
 
       <RouteOnMap />
       <FirstPersonView />
+      <WalkView />
+      <MeOnMap />
       <LayersOnMap />
     </div>
   )
