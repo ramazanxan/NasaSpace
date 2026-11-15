@@ -207,6 +207,13 @@
   background: var(--c-danger);
 }
 
+/* ---------- first person ---------- */
+
+/* Primary in place (full width, raised), quiet in colour: the accent stays on the route. */
+.route-fpv {
+  align-self: stretch;
+}
+
 /* ---------- elevation profile ---------- */
 
 .route-profile {

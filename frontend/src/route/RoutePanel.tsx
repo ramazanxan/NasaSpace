@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ArrowUpDown, ChevronRight, Crosshair, Footprints, RotateCcw, Truck, X } from 'lucide-react'
+import { ArrowUpDown, ChevronRight, Crosshair, Footprints, Navigation, RotateCcw, Truck, X } from 'lucide-react'
 import type { LonLat, RiskLevel, RoutePlan, TravelMode } from '../api/types'
 import { formatCoord } from '../map/geo'
 import { useApp, useProfile } from '../store/useApp'
@@ -160,7 +160,7 @@ export function RoutePanel() {
   const status = useApp((s) => s.routeStatus)
   const error = useApp((s) => s.routeError)
   const profile = useProfile()
-  const { setMode, setPick, setPoint, clearRoute } = useApp.getState()
+  const { setMode, setPick, setPoint, clearRoute, setFpv } = useApp.getState()
   const [retry, setRetry] = useState(0)
 
   const retryable = useRouteRequest(retry)
@@ -254,6 +254,17 @@ export function RoutePanel() {
           {plan && status !== 'error' && plan.status === 'OK' && (
             <>
               <RouteStats plan={plan} stale={loading} />
+              {cells.length > 1 && (
+                <Button
+                  variant="secondary"
+                  className="route-fpv"
+                  icon={<Navigation size={16} strokeWidth={1.5} aria-hidden />}
+                  onClick={() => setFpv(true)}
+                  disabled={loading}
+                >
+                  Drive in first person
+                </Button>
+              )}
               {cells.length > 1 && <ElevationProfile cells={cells} />}
               {status === 'ready' && (
                 <RouteCompare req={{ start: from, goal: to, mode, departureHour: plan.departureHour ?? hour }} />

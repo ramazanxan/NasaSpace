@@ -67,6 +67,10 @@ interface AppState {
   setHoverIndex: (i: number | null) => void
   clearRoute: () => void
 
+  // first-person drive along the route
+  fpv: boolean
+  setFpv: (v: boolean) => void
+
   // layers
   trek: Record<TrekOverlayId, OverlayState>
   /** One backend analysis layer at a time, or none. */
@@ -123,10 +127,14 @@ export const useApp = create<AppState>((set) => ({
       plan: plan === undefined ? s.plan : plan,
       routeError: error ?? null,
       hoverIndex: null,
+      fpv: status === 'ready' ? s.fpv : false,
     })),
   setHoverIndex: (hoverIndex) => set({ hoverIndex }),
   clearRoute: () =>
-    set({ from: null, to: null, plan: null, routeStatus: 'idle', routeError: null, hoverIndex: null, pick: null }),
+    set({ from: null, to: null, plan: null, routeStatus: 'idle', routeError: null, hoverIndex: null, pick: null, fpv: false }),
+
+  fpv: false,
+  setFpv: (fpv) => set({ fpv }),
 
   trek: {
     dust: { visible: false, opacity: 0.6 },

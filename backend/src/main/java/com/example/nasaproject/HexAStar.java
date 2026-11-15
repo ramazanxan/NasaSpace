@@ -631,6 +631,7 @@ public class HexAStar {
                     if (c == 's') byElev = false;
                     if (c == 'r') fit();
                     if (c == 'c') { start = goal = -1; res = null; status = "Left click = start, right click = goal"; }
+                    if (c == 'v' && res != null) Tablet3D.show(res, start, goal);
                     if (c == 'x' && res != null) {
                         try {
                             export(res, "route.geojson");
@@ -738,7 +739,7 @@ public class HexAStar {
             g.setFont(new Font("SansSerif", Font.PLAIN, 13));
             g.drawString((byElev ? "Elevation, m: " + (int) eMin + " .. " + (int) eMax
                                  : "Slope, deg: " + String.format(Locale.US, "%.1f .. %.1f", sMin, sMax))
-                    + "   [E] elevation [S] slope [R] reset view [C] clear [X] save route.geojson", 10, 20);
+                    + "   [E] elevation [S] slope [R] reset view [C] clear [X] save route.geojson [V] 3D view", 10, 20);
             g.drawString(status, 10, 40);
         }
 

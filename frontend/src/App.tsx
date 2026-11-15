@@ -10,6 +10,7 @@ import { RouteOnMap } from './route/RouteOnMap'
 import { LayersControl } from './layers/LayersControl'
 import { LayersOnMap } from './layers/LayersOnMap'
 import { SolTimeline } from './timeline/SolTimeline'
+import { FirstPersonView } from './fpv/FirstPersonView'
 import { useBackendBoot } from './store/useBackendBoot'
 
 /**
@@ -45,6 +46,7 @@ export function App() {
       </div>
 
       <RouteOnMap />
+      <FirstPersonView />
       <LayersOnMap />
     </div>
   )
