@@ -15,7 +15,7 @@ export function Brand() {
         <circle cx="16" cy="16" r="13" fill="var(--c-rust)" />
         <path d="M6 19c5-3 9 2 14-1s6-1 7 0" stroke="var(--c-accent)" strokeWidth="2.4" fill="none" strokeLinecap="round" />
       </svg>
-      <span className="brand__name">NasaSpace</span>
+      <span className="brand__name">MarsNavigator</span>
       <span className={`brand__mode brand__mode--${backend}`} title={status.title}>
         <span className="brand__dot" aria-hidden />
         {status.text}

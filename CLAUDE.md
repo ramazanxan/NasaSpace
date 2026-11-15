@@ -1,4 +1,4 @@
-# NasaSpace
+# MarsNavigator
 
 A web app for planning rover and astronaut routes across Mars, in 3D.
 
